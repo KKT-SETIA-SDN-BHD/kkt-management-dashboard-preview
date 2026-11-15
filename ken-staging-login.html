@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; style-src 'unsafe-inline'; script-src 'sha256-hA9qaMLklfXjyybcpOKpUn0vCQienbckIrch78wNk1s='; form-action 'none'; base-uri 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; style-src 'unsafe-inline'; script-src 'sha256-1cYAMBTESlKdrejqfBqTR/W9xzbLROhrQ9I3gThhAV8='; form-action 'none'; base-uri 'none'; object-src 'none'">
 <title>KKT 外劳管理测试</title>
 <style>
 :root{color-scheme:light;font-family:system-ui,-apple-system,sans-serif;color:#142923;background:#edf3ef}
@@ -31,6 +31,7 @@ ul{padding:0;list-style:none}li{margin:8px 0;overflow-wrap:anywhere}#employees b
 <input id="password" type="password" autocomplete="current-password" required maxlength="256">
 <div class="controls"><button id="login-button" type="submit" disabled>登录</button></div>
 </form>
+<noscript>请在浏览器中启用 JavaScript 后重新打开此页。</noscript>
 <p id="message" role="status" aria-live="polite"></p>
 <div id="workspace" hidden>
 <section aria-labelledby="reminder-title">
@@ -87,9 +88,8 @@ ul{padding:0;list-style:none}li{margin:8px 0;overflow-wrap:anywhere}#employees b
 "use strict";
 const project = "https://qacmlpqtiwwmrypxnnlp.supabase.co";
 const target = {target_org: "28900000-0000-0000-0000-000000000071"};
-const browserKey = new URLSearchParams(location.hash.slice(1)).get("staging");
 if (location.hash) history.replaceState(null, "", location.pathname + location.search);
-const keyReady = /^sb_publishable_[A-Za-z0-9_-]{15,120}$/.test(browserKey || "");
+const gateway = project + "/functions/v1/kkt-hr-staging-gateway";
 const byId = (id) => document.getElementById(id);
 const login = byId("login");
 const workspace = byId("workspace");
@@ -118,18 +118,23 @@ const expiry = byId("document-expiry");
 let token;
 let busy = false;
 
-async function request(path, method, body, session) {
-  const headers = {apikey: browserKey};
-  if (body) headers["Content-Type"] = "application/json";
+async function request(path, body, session) {
+  const headers = {"Content-Type":"application/json"};
   if (session) headers.Authorization = "Bearer " + session;
-  return fetch(project + "/" + path, {
-    method, headers, body: body ? JSON.stringify(body) : undefined,
-    credentials: "omit", cache: "no-store", redirect: "error",
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
+  try {
+    return await fetch(gateway, {
+      method:"POST", headers, body:JSON.stringify({path, data:body}), signal:controller.signal,
+      credentials:"omit", cache:"no-store", redirect:"error",
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function rpc(name, args, session) {
-  const response = await request("rest/v1/rpc/" + name, "POST", args, session);
+  const response = await request("rest/v1/rpc/" + name, args, session);
   if (!response.ok) throw new Error(String(response.status));
   return response.json();
 }
@@ -251,7 +256,7 @@ async function readDocuments() {
 function lock(value) {
   busy = value;
   for (const id of ["refresh", "logout", "save", "clear", "save-document"]) byId(id).disabled = value;
-  loginButton.disabled = value || !keyReady;
+  loginButton.disabled = value;
 }
 
 function clearSession() {
@@ -272,32 +277,32 @@ function permissionMessage(error, fallback) {
 }
 
 lock(false);
-if (!keyReady) report("请使用原有的测试登录链接打开此页。");
 login.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!keyReady || busy) return;
+  if (busy) return;
   lock(true);
   let session;
   report("正在登录测试环境…");
   const password = byId("password").value;
   byId("password").value = "";
   try {
-    const response = await request("auth/v1/token?grant_type=password", "POST", {
+    const response = await request("auth/v1/token?grant_type=password", {
       email: byId("email").value.trim(), password,
     });
     if (!response.ok) {
+      if (response.status >= 500) throw new Error("staging gateway unavailable");
       report(response.status === 429 ? "尝试次数过多，请稍后重试。" : "测试项目登录失败，请核对账号及密码。");
       return;
     }
     session = (await response.json()).access_token;
-    if (!session || !(await request("auth/v1/user", "GET", undefined, session)).ok) throw new Error("401");
+    if (!session || !(await request("auth/v1/user", undefined, session)).ok) throw new Error("401");
     await readDashboard(session);
     token = session;
     login.hidden = true;
     workspace.hidden = false;
     report("已登录测试环境。");
   } catch (error) {
-    if (session) await request("auth/v1/logout?scope=local", "POST", undefined, session).catch(() => {});
+    if (session) await request("auth/v1/logout?scope=local", undefined, session).catch(() => {});
     report(permissionMessage(error, "无法连接测试环境，请重试。"));
   } finally {
     lock(false);
@@ -310,7 +315,7 @@ byId("logout").addEventListener("click", async () => {
   const session = token;
   clearSession();
   try {
-    const response = await request("auth/v1/logout?scope=local", "POST", undefined, session);
+    const response = await request("auth/v1/logout?scope=local", undefined, session);
     report(response.ok ? "已登出。" : "本页已登出，服务端撤销仍待确认。");
   } catch {
     report("本页已登出，服务端撤销仍待确认。");
