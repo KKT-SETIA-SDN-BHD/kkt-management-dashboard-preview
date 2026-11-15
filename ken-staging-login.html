@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; style-src 'unsafe-inline'; script-src 'sha256-Ruf3DHhWo8DQJsNlK+bXbCiJDhHjMKXfp/t34/f2iBo='; form-action 'none'; base-uri 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; style-src 'unsafe-inline'; script-src 'sha256-hA9qaMLklfXjyybcpOKpUn0vCQienbckIrch78wNk1s='; form-action 'none'; base-uri 'none'; object-src 'none'">
 <title>KKT 外劳管理测试</title>
 <style>
 :root{color-scheme:light;font-family:system-ui,-apple-system,sans-serif;color:#142923;background:#edf3ef}
@@ -58,6 +58,28 @@ ul{padding:0;list-style:none}li{margin:8px 0;overflow-wrap:anywhere}#employees b
 <div class="controls"><button id="save" type="submit">保存</button><button id="clear" type="button" class="secondary">新增</button></div>
 </form>
 </section>
+<section id="document-panel" aria-labelledby="document-title" hidden>
+<h2 id="document-title">证件与工卡登记</h2>
+<ul id="document-records"></ul>
+<p id="document-info"></p>
+<form id="document-form" method="post" autocomplete="off">
+<label for="source-document">已索引的 HR 文件</label>
+<select id="source-document" required></select>
+<label for="document-kind">证件类型</label>
+<select id="document-kind" required>
+<option value="WORK_CARD">工卡</option><option value="PERMIT">工作准证</option>
+<option value="PASSPORT">护照</option><option value="CIDB">CIDB</option><option value="FOMEMA">FOMEMA</option><option value="COM">COM</option>
+</select>
+<label for="verification">核实状态</label>
+<select id="verification" required>
+<option value="PENDING">待核实</option><option value="RECORDED">已登记</option>
+<option value="VERIFIED">已核实</option><option value="NOTICE_ONLY">仅提示</option>
+</select>
+<label for="document-expiry">到期日</label>
+<input id="document-expiry" type="date">
+<div class="controls"><button id="save-document" type="submit">保存证件记录</button></div>
+</form>
+</section>
 </div>
 <a href="./">返回管理仪表板预览</a>
 </main>
@@ -86,6 +108,13 @@ const reminderLabels = {
   VERIFY_DOCUMENT: "待核实证件", MISSING_EXPIRY: "待补到期日", NOTICE_ONLY: "仅提示", CURRENT: "有效"
 };
 const staffLabels = {active: "在职", inactive: "离职"};
+const documentPanel = byId("document-panel");
+const documentForm = byId("document-form");
+const documentRecords = byId("document-records");
+const sourceDocument = byId("source-document");
+const kind = byId("document-kind");
+const verification = byId("verification");
+const expiry = byId("document-expiry");
 let token;
 let busy = false;
 
@@ -111,13 +140,17 @@ function syncEndDate() {
 }
 
 function clearForm() {
+  documentPanel.hidden = true;
+  documentRecords.replaceChildren();
+  sourceDocument.replaceChildren();
+  documentForm.reset();
   employeeForm.reset();
   staffRef.readOnly = false;
   byId("edit-title").textContent = "新增模拟员工";
   syncEndDate();
 }
 
-function edit(row) {
+async function edit(row) {
   if (busy) return;
   staffRef.value = row.employee_ref;
   staffRef.readOnly = true;
@@ -128,6 +161,16 @@ function edit(row) {
   endOn.value = row.ended_on || "";
   byId("edit-title").textContent = "编辑模拟员工";
   staffName.focus();
+  documentPanel.hidden = true;
+  documentForm.reset();
+  lock(true);
+  try {
+    await readDocuments();
+  } catch (error) {
+    report(permissionMessage(error, "无法读取证件记录，请重新选择员工。"));
+  } finally {
+    lock(false);
+  }
 }
 
 function listItem(parent, label) {
@@ -160,9 +203,54 @@ async function readDashboard(session) {
   if (!employees.children.length) listItem(employees, "暂无模拟员工");
 }
 
+function currentLabel(control, value) {
+  return [...control.options].find(option => option.value === value)?.textContent || "";
+}
+
+function syncVerification() {
+  verification.disabled = kind.value === "COM";
+  if (verification.disabled) verification.value = "NOTICE_ONLY";
+}
+
+async function readDocuments() {
+  const register = await rpc("kkt_hr_document_register", {...target, staff_ref: staffRef.value}, token);
+  documentRecords.replaceChildren();
+  sourceDocument.replaceChildren();
+  for (const item of register.sources) {
+    const option = document.createElement("option");
+    option.value = item.document_id;
+    option.textContent = item.title;
+    sourceDocument.append(option);
+  }
+  for (const item of register.records) {
+    const date = item.expires_on || "未填写到期日";
+    const label = [item.title, currentLabel(kind, item.document_type), date,
+      reminderLabels[item.review_state] || currentLabel(verification, item.verification_status)].filter(Boolean).join(" · ");
+    const button = document.createElement("button");
+    button.className = "secondary";
+    button.type = "button";
+    button.textContent = label;
+    button.addEventListener("click", () => {
+      if (busy || ![...sourceDocument.options].some(option => option.value === item.document_id)) return;
+      sourceDocument.value = item.document_id;
+      kind.value = item.document_type;
+      verification.value = item.verification_status;
+      expiry.value = item.expires_on || "";
+      syncVerification();
+      expiry.focus();
+    });
+    listItem(documentRecords, button);
+  }
+  if (!documentRecords.children.length) listItem(documentRecords, "暂无已登记证件");
+  documentForm.hidden = !register.sources.length;
+  byId("document-info").textContent = register.sources.length ? "" : "暂无可关联的 HR 文件索引。";
+  documentPanel.hidden = false;
+  syncVerification();
+}
+
 function lock(value) {
   busy = value;
-  for (const id of ["refresh", "logout", "save", "clear"]) byId(id).disabled = value;
+  for (const id of ["refresh", "logout", "save", "clear", "save-document"]) byId(id).disabled = value;
   loginButton.disabled = value || !keyReady;
 }
 
@@ -271,6 +359,29 @@ employeeForm.addEventListener("submit", async (event) => {
     }
   } catch (error) {
     report(permissionMessage(error, "保存失败，请检查编号、名称及日期。"));
+  } finally {
+    lock(false);
+  }
+});
+kind.addEventListener("change", syncVerification);
+documentForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!token || busy || documentPanel.hidden || !staffRef.readOnly || !sourceDocument.value) return;
+  lock(true);
+  try {
+    await rpc("kkt_hr_save_document", {
+      ...target, staff_ref: staffRef.value, source_document: sourceDocument.value,
+      kind: kind.value, verified_state: verification.value, expires: expiry.value || null,
+    }, token);
+    try {
+      await readDocuments();
+      await readDashboard(token);
+      report("已保存证件记录。");
+    } catch (error) {
+      report(permissionMessage(error, "已保存证件记录。请重新选择员工以刷新。"));
+    }
+  } catch (error) {
+    report(permissionMessage(error, "证件记录保存失败，请核对文件与证件资料。"));
   } finally {
     lock(false);
   }
