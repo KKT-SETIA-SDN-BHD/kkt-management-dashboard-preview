@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; style-src 'unsafe-inline'; script-src 'sha256-u0Htm+a3Vx+4AyZpsY0UHA16kCMBuQdNNp6quXHNwws='; form-action 'none'; base-uri 'none'; object-src 'none'">
+<title>KKT 测试登录</title>
+<style>
+:root{color-scheme:light;font-family:system-ui,-apple-system,sans-serif;color:#12252b;background:#edf3ef}
+body{margin:0;padding:24px}main{max-width:400px;margin:8vh auto;padding:24px;background:white;border:1px solid #d4e2d9;border-radius:16px}
+h1{margin:0 0 8px;font-size:1.7rem}p{line-height:1.5}.tag{color:#00604b;font-size:13px;font-weight:750;margin:0 0 8px}
+label{display:block;margin:16px 0 4px;font-weight:650}input,button{box-sizing:border-box;width:100%;font:inherit;min-height:44px;padding:9px 11px;border-radius:8px}
+input{border:1px solid #768c84}button{margin-top:16px;background:#075747;color:#fff;border:0;font-weight:700}button:disabled{opacity:.55}#result{min-height:1.5em}a{color:#075747}
+</style>
+</head>
+<body>
+<main>
+<p class="tag">KKT MANAGEMENT DASHBOARD · STAGING</p>
+<h1>测试登录</h1>
+<p>验证 Supabase 账号。此入口只测试登录和登出。</p>
+<form id="login" method="post" autocomplete="on">
+<label for="email">登录邮箱</label>
+<input id="email" type="email" autocomplete="username" required maxlength="254">
+<label for="password">Supabase 密码</label>
+<input id="password" type="password" autocomplete="current-password" required maxlength="256">
+<button id="submit" type="submit" disabled>测试登录</button>
+</form>
+<button id="logout" type="button" hidden>登出</button>
+<p id="result" role="status" aria-live="polite"></p>
+<a href="./">返回仪表板模拟预览</a>
+</main>
+<script>
+"use strict";
+const project = "https://qacmlpqtiwwmrypxnnlp.supabase.co";
+const fragment = new URLSearchParams(location.hash.slice(1));
+const browserKey = fragment.get("staging");
+history.replaceState(null, "", location.pathname);
+const keyReady = /^sb_publishable_[A-Za-z0-9_-]{15,120}$/.test(browserKey || "");
+const byId = (id) => document.getElementById(id);
+const login = byId("login");
+const logout = byId("logout");
+const submit = byId("submit");
+const report = (message) => { byId("result").textContent = message; };
+let token;
+
+async function auth(path, method, body, session) {
+  const headers = {apikey: browserKey};
+  if (body) headers["Content-Type"] = "application/json";
+  if (session) headers.Authorization = "Bearer " + session;
+  return fetch(project + "/auth/v1/" + path, {
+    method, headers, body: body ? JSON.stringify(body) : undefined,
+    credentials: "omit", cache: "no-store", redirect: "error",
+  });
+}
+
+submit.disabled = !keyReady;
+if (!keyReady) report("请从原测试入口链接重新打开此页。");
+login.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!keyReady || submit.disabled) return;
+  submit.disabled = true;
+  report("正在验证账号…");
+  const password = byId("password").value;
+  byId("password").value = "";
+  try {
+    const response = await auth("token?grant_type=password", "POST", {email: byId("email").value.trim(), password});
+    if (!response.ok) {
+      report(response.status === 429 ? "尝试次数过多，请稍后重试。" : "登录失败，请核对测试项目邮箱及密码。");
+      return;
+    }
+    const data = await response.json();
+    if (!data.access_token) throw new Error("missing access token");
+    const verified = await auth("user", "GET", undefined, data.access_token);
+    if (!verified.ok) {
+      await auth("logout?scope=local", "POST", undefined, data.access_token).catch(() => {});
+      throw new Error("session verification failed");
+    }
+    token = data.access_token;
+    login.hidden = true;
+    logout.hidden = false;
+    report("测试登录成功。请点登出完成测试。");
+  } catch {
+    report("无法完成测试登录，请检查网络或稍后重试。");
+  } finally {
+    submit.disabled = false;
+  }
+});
+
+logout.addEventListener("click", async () => {
+  const session = token;
+  token = undefined;
+  login.hidden = false;
+  logout.hidden = true;
+  try {
+    const response = await auth("logout?scope=local", "POST", undefined, session);
+    report(response.ok ? "已登出。" : "本页已登出，服务端撤销仍待确认。");
+  } catch {
+    report("本页已登出，服务端撤销仍待确认。");
+  }
+});
+</script>
+</body>
+</html>
