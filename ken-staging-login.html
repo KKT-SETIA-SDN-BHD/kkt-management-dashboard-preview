@@ -2,101 +2,277 @@
 <html lang="zh-Hans">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; style-src 'unsafe-inline'; script-src 'sha256-u0Htm+a3Vx+4AyZpsY0UHA16kCMBuQdNNp6quXHNwws='; form-action 'none'; base-uri 'none'; object-src 'none'">
-<title>KKT 测试登录</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; style-src 'unsafe-inline'; script-src 'sha256-Ruf3DHhWo8DQJsNlK+bXbCiJDhHjMKXfp/t34/f2iBo='; form-action 'none'; base-uri 'none'; object-src 'none'">
+<title>KKT 外劳管理测试</title>
 <style>
-:root{color-scheme:light;font-family:system-ui,-apple-system,sans-serif;color:#12252b;background:#edf3ef}
-body{margin:0;padding:24px}main{max-width:400px;margin:8vh auto;padding:24px;background:white;border:1px solid #d4e2d9;border-radius:16px}
-h1{margin:0 0 8px;font-size:1.7rem}p{line-height:1.5}.tag{color:#00604b;font-size:13px;font-weight:750;margin:0 0 8px}
-label{display:block;margin:16px 0 4px;font-weight:650}input,button{box-sizing:border-box;width:100%;font:inherit;min-height:44px;padding:9px 11px;border-radius:8px}
-input{border:1px solid #768c84}button{margin-top:16px;background:#075747;color:#fff;border:0;font-weight:700}button:disabled{opacity:.55}#result{min-height:1.5em}a{color:#075747}
+:root{color-scheme:light;font-family:system-ui,-apple-system,sans-serif;color:#142923;background:#edf3ef}
+body{margin:0;padding:20px}main{max-width:680px;margin:auto}header{margin:12px 0 20px}h1,h2{line-height:1.2}h1{font-size:clamp(1.7rem,6vw,2.4rem);margin:10px 0}h2{font-size:1.15rem;margin:0 0 12px}
+section,form#login{background:#fff;border:1px solid #ccdcd4;border-radius:16px;padding:18px;margin:0 0 14px}.tag{font-size:.875rem;font-weight:700;color:#125c45}
+p{line-height:1.5}label{display:block;font-weight:650;margin:12px 0 4px}input,select,button{box-sizing:border-box;min-height:44px;font:inherit;border-radius:8px;padding:8px 12px}
+input,select{width:100%;background:#fff;border:1px solid #6e8279}button{background:#075747;color:white;border:0;font-weight:700;cursor:pointer}button:disabled{opacity:.6;cursor:default}
+button.secondary{color:#075747;background:#e6f2ec}.controls{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}.dates{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:10px}
+ul{padding:0;list-style:none}li{margin:8px 0;overflow-wrap:anywhere}#employees button{width:100%;text-align:left;overflow-wrap:anywhere}a{color:#075747}
+#message{min-height:1.5em}button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:3px solid #268163;outline-offset:2px}
 </style>
 </head>
 <body>
 <main>
-<p class="tag">KKT MANAGEMENT DASHBOARD · STAGING</p>
-<h1>测试登录</h1>
-<p>验证 Supabase 账号。此入口只测试登录和登出。</p>
+<header>
+<span class="tag">KKT · 测试环境</span>
+<h1>外劳管理</h1>
+<p>此入口仅用于模拟员工资料和到期提醒验收。请使用测试项目账号。</p>
+</header>
 <form id="login" method="post" autocomplete="on">
 <label for="email">登录邮箱</label>
 <input id="email" type="email" autocomplete="username" required maxlength="254">
-<label for="password">Supabase 密码</label>
+<label for="password">测试项目密码</label>
 <input id="password" type="password" autocomplete="current-password" required maxlength="256">
-<button id="submit" type="submit" disabled>测试登录</button>
+<div class="controls"><button id="login-button" type="submit" disabled>登录</button></div>
 </form>
-<button id="logout" type="button" hidden>登出</button>
-<p id="result" role="status" aria-live="polite"></p>
-<a href="./">返回仪表板模拟预览</a>
+<p id="message" role="status" aria-live="polite"></p>
+<div id="workspace" hidden>
+<section aria-labelledby="reminder-title">
+<h2 id="reminder-title">到期提醒</h2>
+<ul id="reminders"></ul>
+</section>
+<section aria-labelledby="employee-title">
+<h2 id="employee-title">模拟员工</h2>
+<div class="controls"><button id="refresh" class="secondary" type="button">刷新</button><button id="logout" class="secondary" type="button">登出</button></div>
+<ul id="employees"></ul>
+</section>
+<section aria-labelledby="edit-title">
+<h2 id="edit-title">新增模拟员工</h2>
+<form id="employee-form" method="post" autocomplete="off">
+<label for="staff-ref">员工编号</label>
+<input id="staff-ref" required maxlength="64" pattern="SYNTHETIC-[A-Za-z0-9][A-Za-z0-9._\-]*" placeholder="SYNTHETIC-123">
+<label for="staff-name">显示名称</label>
+<input id="staff-name" required maxlength="120" placeholder="测试员工">
+<label for="staff-state">状态</label>
+<select id="staff-state"><option value="active">在职</option><option value="inactive">离职</option></select>
+<div class="dates">
+<div><label for="start-on">入职日期</label><input id="start-on" type="date"></div>
+<div><label for="end-on">离职日期</label><input id="end-on" type="date" disabled></div>
+</div>
+<div class="controls"><button id="save" type="submit">保存</button><button id="clear" type="button" class="secondary">新增</button></div>
+</form>
+</section>
+</div>
+<a href="./">返回管理仪表板预览</a>
 </main>
 <script>
 "use strict";
 const project = "https://qacmlpqtiwwmrypxnnlp.supabase.co";
-const fragment = new URLSearchParams(location.hash.slice(1));
-const browserKey = fragment.get("staging");
-history.replaceState(null, "", location.pathname);
+const target = {target_org: "28900000-0000-0000-0000-000000000071"};
+const browserKey = new URLSearchParams(location.hash.slice(1)).get("staging");
+if (location.hash) history.replaceState(null, "", location.pathname + location.search);
 const keyReady = /^sb_publishable_[A-Za-z0-9_-]{15,120}$/.test(browserKey || "");
 const byId = (id) => document.getElementById(id);
 const login = byId("login");
-const logout = byId("logout");
-const submit = byId("submit");
-const report = (message) => { byId("result").textContent = message; };
+const workspace = byId("workspace");
+const loginButton = byId("login-button");
+const employeeForm = byId("employee-form");
+const staffRef = byId("staff-ref");
+const staffName = byId("staff-name");
+const staffState = byId("staff-state");
+const startOn = byId("start-on");
+const endOn = byId("end-on");
+const employees = byId("employees");
+const reminders = byId("reminders");
+const report = (message) => { byId("message").textContent = message; };
+const reminderLabels = {
+  EXPIRED: "已过期", DUE_TODAY: "今日到期", DUE_WITHIN_30_DAYS: "30 天内到期",
+  VERIFY_DOCUMENT: "待核实证件", MISSING_EXPIRY: "待补到期日", NOTICE_ONLY: "仅提示", CURRENT: "有效"
+};
+const staffLabels = {active: "在职", inactive: "离职"};
 let token;
+let busy = false;
 
-async function auth(path, method, body, session) {
+async function request(path, method, body, session) {
   const headers = {apikey: browserKey};
   if (body) headers["Content-Type"] = "application/json";
   if (session) headers.Authorization = "Bearer " + session;
-  return fetch(project + "/auth/v1/" + path, {
+  return fetch(project + "/" + path, {
     method, headers, body: body ? JSON.stringify(body) : undefined,
     credentials: "omit", cache: "no-store", redirect: "error",
   });
 }
 
-submit.disabled = !keyReady;
-if (!keyReady) report("请从原测试入口链接重新打开此页。");
+async function rpc(name, args, session) {
+  const response = await request("rest/v1/rpc/" + name, "POST", args, session);
+  if (!response.ok) throw new Error(String(response.status));
+  return response.json();
+}
+
+function syncEndDate() {
+  endOn.disabled = staffState.value !== "inactive";
+  if (endOn.disabled) endOn.value = "";
+}
+
+function clearForm() {
+  employeeForm.reset();
+  staffRef.readOnly = false;
+  byId("edit-title").textContent = "新增模拟员工";
+  syncEndDate();
+}
+
+function edit(row) {
+  if (busy) return;
+  staffRef.value = row.employee_ref;
+  staffRef.readOnly = true;
+  staffName.value = row.preferred_name || "";
+  staffState.value = row.employment_state;
+  startOn.value = row.joined_on || "";
+  syncEndDate();
+  endOn.value = row.ended_on || "";
+  byId("edit-title").textContent = "编辑模拟员工";
+  staffName.focus();
+}
+
+function listItem(parent, label) {
+  const item = document.createElement("li");
+  if (typeof label === "string") item.textContent = label;
+  else item.append(label);
+  parent.append(item);
+}
+
+async function readDashboard(session) {
+  const summary = await rpc("kkt_hr_manager_status", target, session);
+  if (!summary.authorized) throw new Error("403");
+  const records = await rpc("kkt_hr_list_employees", target, session);
+  reminders.replaceChildren();
+  for (const [state, label] of Object.entries(reminderLabels)) {
+    const amount = summary.reminders?.[state];
+    if (Number.isSafeInteger(amount) && amount > 0) listItem(reminders, label + " · " + amount);
+  }
+  if (!reminders.children.length) listItem(reminders, "暂无提醒");
+  employees.replaceChildren();
+  for (const row of records) {
+    if (!/^SYNTHETIC-/.test(row.employee_ref)) continue;
+    const button = document.createElement("button");
+    button.className = "secondary";
+    button.type = "button";
+    button.textContent = [row.employee_ref, row.preferred_name, staffLabels[row.employment_state]].filter(Boolean).join(" · ");
+    button.addEventListener("click", () => edit(row));
+    listItem(employees, button);
+  }
+  if (!employees.children.length) listItem(employees, "暂无模拟员工");
+}
+
+function lock(value) {
+  busy = value;
+  for (const id of ["refresh", "logout", "save", "clear"]) byId(id).disabled = value;
+  loginButton.disabled = value || !keyReady;
+}
+
+function clearSession() {
+  token = undefined;
+  workspace.hidden = true;
+  login.hidden = false;
+  reminders.replaceChildren();
+  employees.replaceChildren();
+  clearForm();
+}
+
+function permissionMessage(error, fallback) {
+  if (error.message === "401" || error.message === "403") {
+    clearSession();
+    return "测试登录已失效或此账号没有 HR 权限。";
+  }
+  return fallback;
+}
+
+lock(false);
+if (!keyReady) report("请使用原有的测试登录链接打开此页。");
 login.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!keyReady || submit.disabled) return;
-  submit.disabled = true;
-  report("正在验证账号…");
+  if (!keyReady || busy) return;
+  lock(true);
+  let session;
+  report("正在登录测试环境…");
   const password = byId("password").value;
   byId("password").value = "";
   try {
-    const response = await auth("token?grant_type=password", "POST", {email: byId("email").value.trim(), password});
+    const response = await request("auth/v1/token?grant_type=password", "POST", {
+      email: byId("email").value.trim(), password,
+    });
     if (!response.ok) {
-      report(response.status === 429 ? "尝试次数过多，请稍后重试。" : "登录失败，请核对测试项目邮箱及密码。");
+      report(response.status === 429 ? "尝试次数过多，请稍后重试。" : "测试项目登录失败，请核对账号及密码。");
       return;
     }
-    const data = await response.json();
-    if (!data.access_token) throw new Error("missing access token");
-    const verified = await auth("user", "GET", undefined, data.access_token);
-    if (!verified.ok) {
-      await auth("logout?scope=local", "POST", undefined, data.access_token).catch(() => {});
-      throw new Error("session verification failed");
-    }
-    token = data.access_token;
+    session = (await response.json()).access_token;
+    if (!session || !(await request("auth/v1/user", "GET", undefined, session)).ok) throw new Error("401");
+    await readDashboard(session);
+    token = session;
     login.hidden = true;
-    logout.hidden = false;
-    report("测试登录成功。请点登出完成测试。");
-  } catch {
-    report("无法完成测试登录，请检查网络或稍后重试。");
+    workspace.hidden = false;
+    report("已登录测试环境。");
+  } catch (error) {
+    if (session) await request("auth/v1/logout?scope=local", "POST", undefined, session).catch(() => {});
+    report(permissionMessage(error, "无法连接测试环境，请重试。"));
   } finally {
-    submit.disabled = false;
+    lock(false);
   }
 });
 
-logout.addEventListener("click", async () => {
+byId("logout").addEventListener("click", async () => {
+  if (busy || !token) return;
+  lock(true);
   const session = token;
-  token = undefined;
-  login.hidden = false;
-  logout.hidden = true;
+  clearSession();
   try {
-    const response = await auth("logout?scope=local", "POST", undefined, session);
+    const response = await request("auth/v1/logout?scope=local", "POST", undefined, session);
     report(response.ok ? "已登出。" : "本页已登出，服务端撤销仍待确认。");
   } catch {
     report("本页已登出，服务端撤销仍待确认。");
+  } finally {
+    lock(false);
+  }
+});
+
+byId("refresh").addEventListener("click", async () => {
+  if (!token || busy) return;
+  lock(true);
+  try {
+    await readDashboard(token);
+    report("已刷新模拟员工及到期提醒。");
+  } catch (error) {
+    report(permissionMessage(error, "刷新失败，请重试。"));
+  } finally {
+    lock(false);
+  }
+});
+staffState.addEventListener("change", syncEndDate);
+byId("clear").addEventListener("click", () => { if (!busy) clearForm(); });
+employeeForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!token || busy) return;
+  if (!/^SYNTHETIC-[A-Za-z0-9][A-Za-z0-9._-]{0,53}$/.test(staffRef.value) || !staffName.value.trim()) {
+    report("请输入有效的模拟员工编号和名称。");
+    return;
+  }
+  if (startOn.value && endOn.value && endOn.value < startOn.value) {
+    report("离职日期须在入职日期当天或之后。");
+    return;
+  }
+  lock(true);
+  try {
+    await rpc("kkt_hr_save_employee", {
+      ...target, staff_ref: staffRef.value, staff_name: staffName.value.trim(),
+      staff_state: staffState.value, start_on: startOn.value || null, end_on: endOn.value || null,
+    }, token);
+    clearForm();
+    try {
+      await readDashboard(token);
+      report("已保存模拟员工。");
+    } catch (error) {
+      report(permissionMessage(error, "已保存模拟员工。列表刷新失败，请点刷新。"));
+    }
+  } catch (error) {
+    report(permissionMessage(error, "保存失败，请检查编号、名称及日期。"));
+  } finally {
+    lock(false);
   }
 });
 </script>
