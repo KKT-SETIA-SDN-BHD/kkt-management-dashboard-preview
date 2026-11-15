@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111d29">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="KKT Dashboard">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<title>KKT Management Dashboard</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icon.png">
+<link rel="icon" href="./icon.png">
+<link rel="stylesheet" href="./styles.css">
+<script src="./app.js" defer></script>
+</head>
+<body>
+<header class="top"><div class="top-in"><a class="brand" href="./" aria-label="KKT Dashboard"><span>KKT</span><b>Management<br>Dashboard</b></a><button class="quiet" id="session-button" type="button">Demo sign in</button></div></header>
+<main id="main">
+<section class="hero" aria-labelledby="overview-title">
+<div><p class="eyebrow">SYNTHETIC PREVIEW</p><h1 id="overview-title">Management overview</h1><p class="sub">Claims, payments, projects and property.</p></div>
+<div class="sync"><b>Last sync</b><time id="sync-time" datetime="2026-11-13T08:30:00+08:00">13 Nov 2026 · 08:30 MYT</time><span>Source · Synthetic fixtures</span></div>
+</section>
+<nav class="tabs" aria-label="Dashboard sections"><a href="#claims">Claims</a><a href="#project-updates">Projects</a><a href="#property">Property</a></nav>
+<section class="metrics" id="metrics" aria-label="Claim summary"></section>
+<section class="card" id="claims"><div class="section-head"><div><p class="eyebrow">CLAIMS</p><h2>Latest Progressive Claims</h2></div><label>Project <select id="project-filter"><option value="">All demo projects</option></select></label></div><div id="claim-list"></div></section>
+<section class="operations" id="project-updates" aria-label="Project operations"></section>
+<section class="card" id="property"><p class="eyebrow">PROPERTY</p><h2>Property Rental Management</h2><p id="property-notice">Use Demo sign in to inspect a sample portfolio.</p><div id="property-list"></div></section>
+</main>
+<dialog id="claim-dialog" aria-labelledby="detail-title"><div class="dialog-head"><div><p class="eyebrow">CLAIM DETAILS</p><h2 id="detail-title"></h2></div><button type="button" id="close-claim" aria-label="Close claim details">Close</button></div><dl id="claim-details"></dl><div class="actions"><a id="open-pdf" href="./demo-claim.pdf" target="_blank" rel="noopener noreferrer">View PDF</a><a href="./demo-claim.pdf" download="demo-claim.pdf">Download PDF</a><button id="share-pdf" type="button" disabled>Share PDF</button></div><p id="share-status" role="status">Sample PDF. Sharing requires your confirmation in the iPhone share sheet.</p></dialog>
+<dialog id="session-dialog" aria-labelledby="demo-title"><div class="dialog-head"><h2 id="demo-title">Demo sign in</h2><button id="close-session" type="button">Close</button></div><p>Choose a fictional role. This preview uses simulated sessions.</p><div class="actions"><button type="button" data-role="company">Company viewer</button><button type="button" data-role="private">Private viewer</button></div></dialog>
+<footer>Demo mode · Real data access is disabled</footer>
+</body>
+</html>
