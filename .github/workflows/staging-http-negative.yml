@@ -1,0 +1,29 @@
+name: Staging HTTP negative probes (no secrets, no deploy)
+on:
+  workflow_dispatch:
+  push:
+    branches: [release/production-readonly-rc]
+    paths:
+      - '.github/workflows/staging-http-negative.yml'
+permissions:
+  contents: read
+jobs:
+  unauthenticated:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe staging gateway without credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://qacmlpqtiwwmrypxnnlp.supabase.co/functions/v1/kkt-dashboard-readonly'
+          probe() {
+            label="$1"; expected="$2"; shift 2
+            status=$(curl --fail-with-body --silent --show-error --max-time 12 --output /dev/null --write-out '%{http_code}' "$@" || true)
+            echo "$label HTTP $status (expected $expected)"
+            test "$status" = "$expected"
+          }
+          # Supabase platform JWT verification must reject requests without a valid token.
+          probe missing_jwt 401 "$base/projects"
+          probe invalid_jwt 401 -H 'Authorization: Bearer synthetic.invalid.token' "$base/projects"
+          # No real credentials, documents, employee data or service-role secrets.
