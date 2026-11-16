@@ -1,4 +1,4 @@
-name: Android Auth Staging Pages
+name: Android Auth Staging Artifact
 on:
   push:
     branches: [feature/pin-unlock-staging]
@@ -8,28 +8,20 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
-  pages: write
-  id-token: write
-concurrency:
-  group: android-auth-staging-pages
-  cancel-in-progress: true
 jobs:
-  deploy:
-    environment:
-      name: github-pages
+  package:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Prepare isolated site
+      - name: Package isolated staging test page (no public deployment)
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p _site
           cp android-auth-staging.html _site/index.html
           touch _site/.nojekyll
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          path: _site
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          name: android-auth-staging-site
+          path: _site/
+          retention-days: 7
