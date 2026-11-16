@@ -1,7 +1,7 @@
 // Supabase Edge Function — STAGING ONLY; production deployment forbidden until release gates pass.
 // Returns no business data until verified authorization and data mapping are implemented.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const allowedOrigin = "https://kkt-setia-sdn-bhd.github.io";
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
