@@ -12,18 +12,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Probe staging gateway without credentials
+      - name: Verify every dashboard resource rejects missing and invalid JWT
         shell: bash
         run: |
           set -euo pipefail
           base='https://qacmlpqtiwwmrypxnnlp.supabase.co/functions/v1/kkt-dashboard-readonly'
           probe() {
             label="$1"; expected="$2"; shift 2
-            status=$(curl --fail-with-body --silent --show-error --max-time 12 --output /dev/null --write-out '%{http_code}' "$@" || true)
+            status=$(curl --silent --show-error --max-time 12 --output /dev/null --write-out '%{http_code}' "$@")
             echo "$label HTTP $status (expected $expected)"
             test "$status" = "$expected"
           }
-          # Supabase platform JWT verification must reject requests without a valid token.
-          probe missing_jwt 401 "$base/projects"
-          probe invalid_jwt 401 -H 'Authorization: Bearer synthetic.invalid.token' "$base/projects"
-          # No real credentials, documents, employee data or service-role secrets.
+          for resource in projects claims property documents; do
+            probe "${resource}_missing_jwt" 401 "$base/$resource"
+            probe "${resource}_invalid_jwt" 401 -H 'Authorization: Bearer synthetic.invalid.token' "$base/$resource"
+          done
+          # No valid JWT, real user credentials, business rows or secrets are used.
