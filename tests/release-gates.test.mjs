@@ -41,3 +41,28 @@ test('API rejects unverified provenance without showing it as live', async (t) =
   const api = new DashboardApi({baseUrl:'https://example.test/functions/v1/kkt-dashboard-readonly',getAccessToken:async()=> 'synthetic-token'});
   await assert.rejects(api.list('claims'),/INVALID_RESPONSE/);
 });
+
+test('gateway 401 and 403 never return protected rows', async (t) => {
+  const original = globalThis.fetch;
+  t.after(() => {globalThis.fetch = original;});
+  const api = new DashboardApi({baseUrl:'https://example.test/functions/v1/kkt-dashboard-readonly',getAccessToken:async()=> 'synthetic-token'});
+  for (const status of [401,403]) {
+    globalThis.fetch = async () => ({status,ok:false});
+    await assert.rejects(api.list('documents'),/ACCESS_DENIED/);
+  }
+});
+test('gateway requests are GET-only, no-store and credential-free', async (t) => {
+  const original = globalThis.fetch;
+  t.after(() => {globalThis.fetch = original;});
+  let observed;
+  globalThis.fetch = async (url,options) => {
+    observed = {url,options};
+    return {ok:true,status:200,json:async()=>({items:[],asOf:'2026-11-17T00:00:00Z',source:'verified'})};
+  };
+  const api = new DashboardApi({baseUrl:'https://example.test/functions/v1/kkt-dashboard-readonly',getAccessToken:async()=> 'synthetic-token'});
+  await api.list('projects');
+  assert.equal(observed.url,'https://example.test/functions/v1/kkt-dashboard-readonly/projects');
+  assert.equal(observed.options.method,'GET');
+  assert.equal(observed.options.cache,'no-store');
+  assert.equal(observed.options.credentials,'omit');
+});
