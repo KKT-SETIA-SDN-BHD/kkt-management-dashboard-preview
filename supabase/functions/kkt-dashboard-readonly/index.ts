@@ -1,4 +1,4 @@
-// Supabase Edge Function candidate — STAGING ONLY, not deployed.
+// Supabase Edge Function — STAGING ONLY; production deployment forbidden until release gates pass.
 // Returns no business data until verified authorization and data mapping are implemented.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -21,7 +21,7 @@ Deno.serve(async (request) => {
   if (request.method !== "GET") return reply(405,"METHOD_NOT_ALLOWED");
   const url = new URL(request.url);
   const resource = url.pathname.split("/").filter(Boolean).at(-1);
-  if (!resource || !resources.has(resource) || url.pathname !== "/kkt-dashboard-readonly/" + resource) return reply(404,"NOT_FOUND");
+  if (!resource || !resources.has(resource) || url.pathname !== "/functions/v1/kkt-dashboard-readonly/" + resource) return reply(404,"NOT_FOUND");
   const authorization = request.headers.get("authorization") || "";
   if (!/^Bearer\s+\S+$/i.test(authorization)) return reply(401,"AUTH_REQUIRED");
   const client = createClient(supabaseUrl,publishableKey,{auth:{persistSession:false,autoRefreshToken:false},global:{headers:{Authorization:authorization}}});
