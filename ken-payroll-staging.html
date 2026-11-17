@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<title>KKT 员工薪资预览</title>
+<style>
+:root{color-scheme:light;font-family:"Inter",system-ui,sans-serif;background:#ecf3ef;color:#142821;font-size:16px}
+*{box-sizing:border-box}body{margin:0}main{width:min(100% - 32px,700px);margin:32px auto 48px}
+a{color:#095341;text-underline-offset:.2em}header{border-top:5px solid #18664e;padding-top:20px;margin-bottom:20px}
+header p{color:#40574c;margin:.5rem 0 0}h1,h2,h3,p{margin-top:0}h1{margin:0;font-size:clamp(1.8rem,5vw,2.55rem)}
+h2{font-size:1.25rem;margin-bottom:12px}h3{font-size:1rem;margin:18px 0 8px}
+.profile,details{background:#fff;border:1px solid #c8d8cd;border-radius:13px;padding:16px;margin-bottom:12px}
+.profile{display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:12px;margin:0 0 24px}
+dt{color:#40574c;font-size:.85rem}dd{margin:.2rem 0 0;font-weight:650}
+summary{cursor:pointer;font-weight:700;min-height:32px}summary span{float:right;color:#095341;max-width:56%;text-align:right}
+summary:focus-visible,a:focus-visible{outline:3px solid #278564;outline-offset:4px}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;line-height:1.4}
+th,td{border-bottom:1px solid #dce6df;padding:8px 4px;font-size:.9rem;text-align:right}
+th:first-child{text-align:left}thead th{color:#40574c}
+.total{display:flex;justify-content:space-between;gap:8px;padding:12px 10px;background:#e7f2eb;margin:.8rem 0 0;border-radius:8px;font-weight:700}
+footer{margin-top:24px}
+@media(max-width:360px){main{width:calc(100% - 24px)}.profile,details{padding:12px}th,td{font-size:.82rem}}
+</style>
+</head>
+<body>
+<main>
+<header><h1>员工薪资</h1><p>KKT Staging · 合成数据 · 金额仅供页面及对账测试</p></header>
+<section aria-labelledby="staff-heading">
+<h2 id="staff-heading">员工资料</h2>
+<dl class="profile">
+<div><dt>姓名</dt><dd>测试员工 A</dd></div>
+<div><dt>员工代号</dt><dd>SYNTHETIC-KKT001</dd></div>
+<div><dt>在职状态</dt><dd>在职</dd></div>
+</dl>
+</section>
+<section aria-labelledby="pay-heading">
+<h2 id="pay-heading">每月薪资</h2>
+<details open><summary>2026 年 9 月<span>实发 RM 2,435.95</span></summary>
+<h3>收入（RM）</h3><table><tbody>
+<tr><th scope="row">基本薪资 Basic Salary</th><td>2,500.00</td></tr>
+<tr><th scope="row">津贴</th><td>150.00</td></tr>
+<tr><th scope="row">加班费</th><td>120.00</td></tr>
+<tr><th scope="row">奖金和其他收入</th><td>0.00</td></tr>
+<tr><th scope="row">应发薪资</th><td>2,770.00</td></tr>
+</tbody></table>
+<h3>缴纳与扣款（RM）</h3>
+<table><thead><tr><th scope="col">项目</th><th scope="col">员工扣款</th><th scope="col">雇主缴纳</th></tr></thead><tbody>
+<tr><th scope="row">EPF / KWSP</th><td>291.50</td><td>344.50</td></tr>
+<tr><th scope="row">SOCSO / PERKESO</th><td>13.25</td><td>46.35</td></tr>
+<tr><th scope="row">EIS / SIP</th><td>5.30</td><td>5.30</td></tr>
+<tr><th scope="row">PCB / MTD</th><td>24.00</td><td>不适用</td></tr>
+<tr><th scope="row">其他扣款</th><td>0.00</td><td>不适用</td></tr>
+</tbody></table><p class="total"><span>实发薪资</span><span>RM 2,435.95</span></p></details><details><summary>2026 年 8 月<span>实发 RM 2,318.95</span></summary>
+<h3>收入（RM）</h3><table><tbody>
+<tr><th scope="row">基本薪资 Basic Salary</th><td>2,500.00</td></tr>
+<tr><th scope="row">津贴</th><td>150.00</td></tr>
+<tr><th scope="row">加班费</th><td>0.00</td></tr>
+<tr><th scope="row">奖金和其他收入</th><td>0.00</td></tr>
+<tr><th scope="row">应发薪资</th><td>2,650.00</td></tr>
+</tbody></table>
+<h3>缴纳与扣款（RM）</h3>
+<table><thead><tr><th scope="col">项目</th><th scope="col">员工扣款</th><th scope="col">雇主缴纳</th></tr></thead><tbody>
+<tr><th scope="row">EPF / KWSP</th><td>291.50</td><td>344.50</td></tr>
+<tr><th scope="row">SOCSO / PERKESO</th><td>13.25</td><td>46.35</td></tr>
+<tr><th scope="row">EIS / SIP</th><td>5.30</td><td>5.30</td></tr>
+<tr><th scope="row">PCB / MTD</th><td>21.00</td><td>不适用</td></tr>
+<tr><th scope="row">其他扣款</th><td>0.00</td><td>不适用</td></tr>
+</tbody></table><p class="total"><span>实发薪资</span><span>RM 2,318.95</span></p></details>
+</section><footer><a href="./ken-mobile-staging.html">返回 Mr Ken Mobile</a></footer>
+</main>
+</body>
+</html>
