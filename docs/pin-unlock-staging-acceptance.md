@@ -1,6 +1,25 @@
 # KKT internal Dashboard: six-digit PIN unlock — staging acceptance plan
 
-Status: implementation pending; production STOP. Scope: owner and Mr Ken only; projects, progressive claims, OneDrive PDFs, UBS accounting **read-only**.
+## Staging acceptance — 2026-11-18 (MYT)
+
+**PASS for the Android synthetic dashboard. Production remains G2 STOP / NO-GO.**
+
+- [Android Staging](https://kkt-setia-sdn-bhd.github.io/kkt-management-dashboard-preview/android-auth-staging/) runs the PIN release from [commit 60c6188](https://github.com/KKT-SETIA-SDN-BHD/kkt-management-dashboard-preview/commit/60c61887d5f0766281419cf6a9cb063ff930879b), published by [Pages run 44149566069](https://github.com/KKT-SETIA-SDN-BHD/kkt-management-dashboard-preview/actions/runs/44149566069).
+- The user reported Android Chrome PASS for PIN enrollment, manual lock and unlock, and automatic lock after switching to the background. Prior Android Chrome acceptance covered real Staging Auth sign-in, synthetic overview and sign-out.
+- Automation executed the published PIN page script against real Staging Auth with a one-time synthetic account. It verified successful PIN unlock and session termination after five consecutive wrong PINs. Separate script tests covered expiry and failed session revalidation. The PIN belongs to the current authenticated page session. Reload or close requires password sign-in again.
+
+## Staging read-only gateway negative HTTP retest — 2026-11-18 (MYT)
+
+The initial probe returned HTTP 404 for a supported route. [Commit 9751e6d](https://github.com/KKT-SETIA-SDN-BHD/kkt-management-dashboard-preview/commit/9751e6dfa27787302b2baa638f020ccda04d7cb6) corrects route matching, and Staging `kkt-dashboard-readonly` v5 is active with platform JWT verification enabled. The existing contract tests passed 3/3 after their route assertion was updated.
+
+| HTTP case | Result |
+| --- | --- |
+| Missing bearer token across projects, claims, property and documents | 4/4 HTTP 401 |
+| Invalid bearer token across the same four resources | 4/4 HTTP 401 |
+| Real Auth-signed JWT for an unassigned synthetic user across the same resources | 4/4 HTTP 403, `RESOURCE_ACCESS_NOT_YET_APPROVED` |
+| Unknown or nested route with a valid test token | 2/2 HTTP 404 |
+
+None of the responses returned business rows. The synthetic user signed out and was disabled, with zero remaining sessions. The deployed Android frontend serves synthetic fixtures and does not call the read-only gateway. Authorized end-to-end reads and populated cross-scope denial, OneDrive entitlements, source reconciliation, production-grade unlock and release controls remain open.
 
 ## Security architecture
 - First enrollment must use an authenticated Supabase Auth session for the named individual. PIN is a **convenience unlock**, never a stand-alone login credential or a substitute for server authorization.
@@ -23,3 +42,4 @@ Status: implementation pending; production STOP. Scope: owner and Mr Ken only; p
 9. Production deployment only after documented PASS for all required gates.
 
 No production deploy, secret changes, user provisioning, or real-business-data access in this branch.
+
