@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'sha256-5kEbnI9ZoRvE2DkFmlW7gly9whLIj6Z7SeWEbHff0fQ='; base-uri 'none'; form-action 'none'">
 <title>KKT 员工薪资预览</title>
 <style>
 :root{color-scheme:light;font-family:"Inter",system-ui,sans-serif;background:#ecf3ef;color:#142821;font-size:16px}
@@ -29,10 +29,7 @@ legend{font-weight:700;margin-bottom:8px;padding:0}
 .group-options label:has(input:checked){background:#d9ebe0;border-color:#18664e;color:#095341;font-weight:700}
 .group-options input{accent-color:#18664e}
 .group-options input:focus-visible{outline:2px solid #278564;outline-offset:2px}
-[data-payroll-group]{display:none}
-main:has(#local-site:checked) [data-payroll-group="local-site"],
-main:has(#foreign-site:checked) [data-payroll-group="foreign-site"],
-main:has(#office:checked) [data-payroll-group="office"]{display:block}
+[hidden]{display:none!important}
 footer{margin-top:24px}
 @media(max-width:360px){main{width:calc(100% - 24px)}.profile,details{padding:12px}th,td{font-size:.82rem}}
 </style>
@@ -86,7 +83,7 @@ footer{margin-top:24px}
 <tr><th scope="row">其他扣款</th><td>0.00</td><td>不适用</td></tr>
 </tbody></table><p class="total"><span>实发薪资</span><span>RM 2,315.95</span></p></details>
 </section></div>
-<div data-payroll-group="foreign-site" id="foreign-site-records">
+<div hidden data-payroll-group="foreign-site" id="foreign-site-records">
 <section aria-labelledby="foreign-site-staff">
 <h2 id="foreign-site-staff">员工资料</h2>
 <dl class="profile">
@@ -127,7 +124,7 @@ footer{margin-top:24px}
 <tr><th scope="row">其他扣款</th><td>0.00</td><td>不适用</td></tr>
 </tbody></table><p class="total"><span>实发薪资</span><span>RM 2,109.00</span></p></details>
 </section></div>
-<div data-payroll-group="office" id="office-records">
+<div hidden data-payroll-group="office" id="office-records">
 <section aria-labelledby="office-staff">
 <h2 id="office-staff">员工资料</h2>
 <dl class="profile">
@@ -170,5 +167,16 @@ footer{margin-top:24px}
 </section></div>
 <footer><a href="./ken-mobile-staging.html">返回 Mr Ken Mobile</a></footer>
 </main>
+<script>
+const choices = document.querySelectorAll('input[name="payroll-group"]');
+const panels = document.querySelectorAll('[data-payroll-group]');
+function showSelectedGroup() {
+  const selected = document.querySelector('input[name="payroll-group"]:checked');
+  for (const panel of panels) panel.hidden = panel.dataset.payrollGroup !== selected?.id;
+}
+for (const choice of choices) choice.addEventListener('change', showSelectedGroup);
+window.addEventListener('pageshow', showSelectedGroup);
+showSelectedGroup();
+</script>
 </body>
 </html>
