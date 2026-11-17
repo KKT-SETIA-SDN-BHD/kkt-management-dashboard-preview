@@ -1,5 +1,5 @@
 // Supabase Edge Function — STAGING ONLY; production deployment forbidden until release gates pass.
-// Returns no business data until verified authorization and data mapping are implemented.
+// Only authorized synthetic project fixtures are available through this Staging endpoint.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -29,7 +29,11 @@ Deno.serve(async (request) => {
   const client = createClient(supabaseUrl,publishableKey,{auth:{persistSession:false,autoRefreshToken:false},global:{headers:{Authorization:authorization}}});
   const {data,error} = await client.auth.getUser(authorization.replace(/^Bearer\s+/i,""));
   if (error || !data?.user?.id || data.user.is_anonymous) return reply(401,"AUTH_INVALID");
-  // Deliberately fail closed: user existence does NOT grant access to finance or property.
-  // Implement server-verified grants, project-scoped RLS and document entitlements before returning rows.
-  return reply(403,"RESOURCE_ACCESS_NOT_YET_APPROVED");
+  if (resource !== "projects") return reply(403,"RESOURCE_ACCESS_NOT_YET_APPROVED");
+  const {data: rows,error: readError} = await client.rpc("kkt_dashboard_staging_projects");
+  if (readError || !Array.isArray(rows)) return reply(503,"PROJECT_LOOKUP_UNAVAILABLE");
+  if (!rows.length) return reply(403,"RESOURCE_ACCESS_NOT_YET_APPROVED");
+  return new Response(JSON.stringify({
+    items: rows, asOf: new Date().toISOString(), source: "synthetic", nextCursor: null,
+  }), {headers});
 });
