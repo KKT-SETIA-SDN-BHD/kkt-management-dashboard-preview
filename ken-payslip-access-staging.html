@@ -2,7 +2,7 @@
 <html lang="zh-Hans"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; img-src data:; style-src 'unsafe-inline'; script-src 'sha256-omtD1aDUOhigfqbPNWREuTrxY4HbaRK0BIbqUFW1CEE='; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; img-src data:; style-src 'unsafe-inline'; script-src 'sha256-/F6+UzYA5wZbeOsCPcABUvwJZ36MxFb95XyUtEBqZQU='; base-uri 'none'; form-action 'none'">
 <title>KKT 工资单查阅与列印</title>
 <style>
 :root{font-family:system-ui,sans-serif;color:#15273c;background:#f0f3f8}*{box-sizing:border-box}
@@ -22,7 +22,7 @@ button.secondary{background:#e5edf8;color:#243e62}button:disabled{opacity:.6;cur
 @media print{:root{background:white}main{margin:0;padding:0;max-width:none}main>*:not(#print-output){display:none!important}.payslip{margin:0;padding:0;border:0;break-after:page}.payslip:last-child{break-after:auto}.payslip table,.signatures{break-inside:avoid}}
 </style></head>
 <body><main>
-<header><p class="muted">KKT Staging</p><h1>工资单</h1><p>员工可查阅自己的已复核工资单。薪资 Admin 可选择多份列印。</p></header>
+<header><p class="muted">KKT Staging · 合成工资单</p><h1>工资单</h1><p>员工可查阅自己的已复核工资单。薪资 Admin 可选择多份列印。</p></header>
 <section id="login-panel"><form id="login">
 <label for="email">Staging 登录邮箱</label><input id="email" type="email" autocomplete="username" required>
 <label for="password">测试项目密码</label><input id="password" type="password" autocomplete="current-password" required>
@@ -238,11 +238,29 @@ get("login").addEventListener("submit", async event => {
   const password = get("password").value;
   get("password").value = "";
   try {
-    const auth = await api("auth/v1/token?grant_type=password", {email: get("email").value.trim(), password});
+    let auth;
+    try {
+      auth = await api("auth/v1/token?grant_type=password", {email: get("email").value.trim(), password});
+    } catch (error) {
+      if (error.message === "400" || error.message === "401") {
+        say("登录失败。请检查 Staging 邮箱和密码。");
+        return;
+      }
+      if (error.message === "429") {
+        say("登录尝试过多，请稍后重试。");
+        return;
+      }
+      throw error;
+    }
     session = auth.access_token;
     if (!session) throw Error("401");
     role = await rpc("kkt_payroll_viewer_role", {});
-    if (!["employee", "payroll_admin"].includes(role)) throw Error("403");
+    if (!["employee", "payroll_admin"].includes(role)) {
+      await api("auth/v1/logout?scope=local", {}).catch(() => {});
+      clearSession();
+      say("账号登录成功，但尚未开通 Staging 工资单权限。");
+      return;
+    }
     get("viewer").textContent = role === "payroll_admin" ? "薪资 Admin" : "员工";
     get("login-panel").hidden = true;
     get("workspace").hidden = false;
