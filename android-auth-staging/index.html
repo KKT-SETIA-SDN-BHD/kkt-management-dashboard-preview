@@ -28,8 +28,9 @@
     button{background:#175d53;color:#fff;border:0;padding:9px 14px;font-weight:700}
     button:disabled{opacity:.65}
     button:focus-visible,input:focus-visible,h1:focus-visible{outline:3px solid #177c9a;outline-offset:3px}
-    #submit{width:100%;margin-top:18px}
+    form button{width:100%;margin-top:18px}
     #logout{background:#fff;color:#172d42}
+    .overview-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
     #status{margin:14px 0;min-height:1.5em}
     .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,178px),1fr));gap:10px;margin:18px 0}
     .summary p{font-size:1.35rem;font-weight:700}
@@ -55,11 +56,34 @@
         <input id="password" type="password" autocomplete="current-password" required>
         <button id="submit" type="submit">登录 Staging</button>
       </form>
-      <p class="muted"><small>测试会话仅保留在当前页面。PIN 尚未启用。</small></p>
+      <p class="muted"><small>登录后可设置六位 PIN，在当前页面锁定和解锁。刷新页面后需重新登录。</small></p>
     </div>
     <p id="status" role="status" aria-live="polite"></p>
+    <section id="pin-setup" class="panel" aria-labelledby="pin-setup-title" hidden>
+      <h1 id="pin-setup-title" tabindex="-1">设置六位 PIN</h1>
+      <p class="muted">请设置本次测试专用的 PIN，避免使用银行卡或手机解锁 PIN。</p>
+      <form id="pin-enroll">
+        <label class="field" for="new-pin">六位数字</label>
+        <input id="new-pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="off" required>
+        <label class="field" for="confirm-pin">再次输入 PIN</label>
+        <input id="confirm-pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="off" required>
+        <button id="save-pin" type="submit">设置 PIN 并进入</button>
+      </form>
+    </section>
+    <section id="pin-lock" class="panel" aria-labelledby="pin-lock-title" hidden>
+      <h1 id="pin-lock-title" tabindex="-1">Dashboard 已锁定</h1>
+      <p class="muted">输入本次测试设置的 PIN。连续输错五次后需重新登录。</p>
+      <form id="pin-unlock">
+        <label class="field" for="unlock-pin">六位 PIN</label>
+        <input id="unlock-pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="off" required>
+        <button id="verify-pin" type="submit">解锁</button>
+      </form>
+    </section>
     <section id="dashboard" class="dashboard" aria-labelledby="overview" hidden>
-      <h1 id="overview" tabindex="-1">管理总览</h1>
+      <div class="overview-header">
+        <h1 id="overview" tabindex="-1">管理总览</h1>
+        <button id="lock" type="button">锁定</button>
+      </div>
       <p class="muted">以下是演示用的模拟资料。</p>
       <div class="summary" aria-label="模拟统计">
         <article><h2>工程进行中</h2><p>2</p></article>
@@ -87,8 +111,12 @@
     const byId = id => document.getElementById(id);
     const dashboard = byId('dashboard');
     const loginPanel = byId('login-panel');
+    const pinSetup = byId('pin-setup');
+    const pinLock = byId('pin-lock');
     const logout = byId('logout');
     const status = byId('status');
+    const maxPinAttempts = 5;
+    const sixDigits = /^[0-9]{6}$/;
     let session = null;
     let sessionTimeout;
 
@@ -107,10 +135,42 @@
     function showLogin(message) {
       clearTimeout(sessionTimeout);
       session = null;
-      dashboard.hidden = true;
-      logout.hidden = true;
-      loginPanel.hidden = false;
+      byId('new-pin').value = '';
+      byId('confirm-pin').value = '';
+      byId('unlock-pin').value = '';
+      showPanel(loginPanel, message);
+    }
+
+    function showPanel(panel, message, focusId) {
+      loginPanel.hidden = panel !== loginPanel;
+      pinSetup.hidden = panel !== pinSetup;
+      pinLock.hidden = panel !== pinLock;
+      dashboard.hidden = panel !== dashboard;
+      logout.hidden = !session;
       status.textContent = message;
+      if (focusId) byId(focusId).focus();
+    }
+
+    function lockDashboard() {
+      if (!session?.pin || dashboard.hidden) return;
+      showPanel(pinLock, '已锁定，请输入 PIN。', 'pin-lock-title');
+    }
+
+    async function pinDigest(pin, salt) {
+      const keyMaterial = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveBits']);
+      const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', iterations: 600000, salt }, keyMaterial, 256);
+      return new Uint8Array(bits);
+    }
+
+    function sameDigest(first, second) {
+      let difference = 0;
+      for (let index = 0; index < first.length; index++) difference |= first[index] ^ second[index];
+      return difference === 0;
+    }
+
+    async function verifySession(active) {
+      const verified = await request('/user', { headers: { Authorization: 'Bearer ' + active.token } });
+      return verified.ok && (await verified.json()).id === active.userId;
     }
 
     function checkExpiry() {
@@ -142,18 +202,14 @@
         if (!result.user?.id || !result.access_token || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
           throw new Error('Invalid session response');
         }
-        const verified = await request('/user', { headers: { Authorization: 'Bearer ' + result.access_token } });
-        if (!verified.ok || (await verified.json()).id !== result.user.id || expiresAt <= Date.now()) {
+        const active = { token: result.access_token, userId: result.user.id, expiresAt, pin: null, failedAttempts: 0 };
+        if (!(await verifySession(active)) || expiresAt <= Date.now()) {
           throw new Error('Session verification failed');
         }
 
-        session = { token: result.access_token, expiresAt };
+        session = active;
         sessionTimeout = window.setTimeout(checkExpiry, expiresAt - Date.now());
-        loginPanel.hidden = true;
-        dashboard.hidden = false;
-        logout.hidden = false;
-        status.textContent = '已登录 Supabase Staging。';
-        byId('overview').focus();
+        showPanel(pinSetup, '已登录 Supabase Staging。', 'pin-setup-title');
       } catch {
         showLogin('无法确认 Staging 会话，请检查网络后再试。');
       } finally {
@@ -162,7 +218,79 @@
       }
     });
 
-    logout.addEventListener('click', async () => {
+    byId('pin-enroll').addEventListener('submit', async event => {
+      event.preventDefault();
+      checkExpiry();
+      const submit = byId('save-pin');
+      if (!session || pinSetup.hidden || submit.disabled) return;
+      const active = session;
+      const pin = byId('new-pin').value;
+      const confirmation = byId('confirm-pin').value;
+      byId('new-pin').value = '';
+      byId('confirm-pin').value = '';
+      if (!sixDigits.test(pin) || pin !== confirmation) {
+        status.textContent = '请输入两次相同的六位数字。';
+        byId('new-pin').focus();
+        return;
+      }
+      submit.disabled = true;
+      try {
+        const salt = crypto.getRandomValues(new Uint8Array(16));
+        const digest = await pinDigest(pin, salt);
+        checkExpiry();
+        if (session !== active) return;
+        active.pin = { salt, digest };
+        showPanel(dashboard, 'PIN 已启用。', 'overview');
+        if (document.hidden) lockDashboard();
+      } catch {
+        if (session === active) status.textContent = '无法设置 PIN，请使用新版 Chrome 重试。';
+      } finally {
+        submit.disabled = false;
+      }
+    });
+
+    byId('lock').addEventListener('click', lockDashboard);
+    byId('pin-unlock').addEventListener('submit', async event => {
+      event.preventDefault();
+      checkExpiry();
+      const submit = byId('verify-pin');
+      const pin = byId('unlock-pin').value;
+      byId('unlock-pin').value = '';
+      if (!session?.pin || pinLock.hidden || submit.disabled || !sixDigits.test(pin)) return;
+      const active = session;
+      submit.disabled = true;
+      try {
+        const digest = await pinDigest(pin, active.pin.salt);
+        checkExpiry();
+        if (session !== active) return;
+        if (!sameDigest(digest, active.pin.digest)) {
+          const remaining = maxPinAttempts - ++active.failedAttempts;
+          if (!remaining) {
+            await endSession('PIN 连续错误五次，请重新登录。');
+          } else {
+            status.textContent = `PIN 不正确。还可尝试 ${remaining} 次。`;
+            byId('unlock-pin').focus();
+          }
+          return;
+        }
+        const valid = await verifySession(active);
+        checkExpiry();
+        if (session !== active) return;
+        if (!valid) {
+          showLogin('无法确认原有会话，请重新登录。');
+          return;
+        }
+        active.failedAttempts = 0;
+        if (document.hidden) return;
+        showPanel(dashboard, '已解锁。', 'overview');
+      } catch {
+        if (session === active) status.textContent = '无法完成解锁，请检查网络后再试。';
+      } finally {
+        submit.disabled = false;
+      }
+    });
+
+    async function endSession(message) {
       if (!session || logout.disabled) return;
       const { token } = session;
       logout.disabled = true;
@@ -174,18 +302,24 @@
           method: 'POST',
           headers: { Authorization: 'Bearer ' + token },
         });
-        status.textContent = response.ok ? '已登出。' : '此页面已退出，服务器登出未确认。';
+        status.textContent = response.ok ? message : '此页面已退出，服务器登出未确认。';
       } catch {
         status.textContent = '此页面已退出，服务器登出未确认。';
       } finally {
         submit.disabled = false;
         logout.disabled = false;
       }
-    });
+    }
+    logout.addEventListener('click', () => endSession('已登出。'));
 
-    document.addEventListener('visibilitychange', checkExpiry);
+    document.addEventListener('visibilitychange', () => {
+      checkExpiry();
+      if (document.hidden) lockDashboard();
+    });
     window.addEventListener('pageshow', event => {
-      if (event.persisted) checkExpiry();
+      if (!event.persisted) return;
+      checkExpiry();
+      lockDashboard();
     });
   </script>
 </body>
