@@ -2,23 +2,39 @@
 <html lang="zh-Hans">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#111d29">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Mr Ken Mobile">
   <meta name="robots" content="noindex, nofollow">
   <meta name="referrer" content="no-referrer">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
   <title>Mr Ken Mobile · 工程资料</title>
+  <link rel="icon" href="./icon.png">
+  <link rel="apple-touch-icon" href="./icon.png">
+  <link rel="stylesheet" href="./styles.css">
   <link rel="stylesheet" href="./ken-mobile-staging.css">
   <script src="./ken-mobile-staging.js" defer></script>
 </head>
 <body>
-  <main>
-    <header>
-      <p class="eyebrow">KKT · Staging</p>
-      <h1>工程资料</h1>
-      <p>用已授权的 Mr Ken 账号登录，查看工程原件核对记录。</p>
-    </header>
+  <header class="top">
+    <div class="top-in">
+      <a class="brand" href="#overview"><span>KKT</span><b>Mr Ken<br>Mobile</b></a>
+      <button class="quiet" id="signout" type="button" hidden>登出</button>
+    </div>
+  </header>
 
-    <form id="signin">
+  <main>
+    <section class="hero" id="overview" aria-labelledby="overview-title">
+      <div>
+        <p class="eyebrow">STAGING</p>
+        <h1 id="overview-title">工程资料</h1>
+        <p class="sub" id="intro">登录查看获授权工程的原件核对记录。</p>
+      </div>
+    </section>
+
+    <form class="card login-card" id="signin" aria-labelledby="signin-title">
+      <h2 id="signin-title">登录</h2>
       <label for="email">登录邮箱</label>
       <input id="email" type="email" maxlength="320" autocomplete="username" required>
       <label for="password">密码</label>
@@ -26,14 +42,45 @@
       <button id="enter" type="submit">登录</button>
     </form>
 
-    <p id="status" role="status" aria-live="polite"></p>
-    <section id="results" aria-labelledby="heading" hidden>
-      <div class="bar">
-        <h2 id="heading">项目原件记录</h2>
-        <button id="signout" type="button">登出</button>
-      </div>
-      <ul id="updates"></ul>
-    </section>
+    <p class="status" id="status" role="status" aria-live="polite"></p>
+
+    <div id="results" hidden>
+      <nav class="tabs" aria-label="工程资料导航">
+        <a href="#overview">概览</a>
+        <a href="#records">原件记录</a>
+      </nav>
+
+      <section class="metrics" aria-label="工程资料概览">
+        <div class="metric">
+          <h2>原件记录</h2>
+          <strong id="record-count">—</strong>
+        </div>
+        <div class="metric">
+          <h2>工程</h2>
+          <strong id="project-count">—</strong>
+        </div>
+        <div class="metric">
+          <h2>最新原件日期</h2>
+          <strong id="latest-date">—</strong>
+        </div>
+      </section>
+
+      <section class="card" id="records" aria-labelledby="records-title">
+        <div class="section-head">
+          <div>
+            <h2 id="records-title">项目原件记录</h2>
+            <p class="meta" id="filter-count" aria-live="polite"></p>
+          </div>
+          <label for="project-filter">选择工程
+            <select id="project-filter">
+              <option value="">全部工程</option>
+            </select>
+          </label>
+        </div>
+        <ul class="update-list" id="updates"></ul>
+        <p class="sub empty" id="empty" hidden>此账号暂无授权的工程记录。</p>
+      </section>
+    </div>
   </main>
 </body>
 </html>
