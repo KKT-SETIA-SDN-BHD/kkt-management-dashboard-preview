@@ -1,3 +1,192 @@
-<!doctype html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; base-uri 'none'; form-action 'none'"><title>KKT Android Auth Test · Staging</title><style>body{font:16px system-ui;background:#eef3f6;color:#152b40;display:grid;place-items:center;min-height:100dvh;margin:0;padding:18px}main{background:white;max-width:420px;width:100%;padding:26px;border-radius:18px;box-sizing:border-box}input,button{font:inherit;width:100%;box-sizing:border-box;padding:13px;border-radius:9px;margin:6px 0 15px}input{border:1px solid #9eacbb}button{border:0;background:#173b5b;color:white;font-weight:700}button:disabled{opacity:.6}small{color:#536779}#status{min-height:3em}</style></head><body><main><strong>KKT Dashboard · Staging</strong><h2>Android 首次登录测试</h2><p><small>请使用专用的 Supabase Staging 测试账号。这里没有业务资料，PIN 尚未启用。</small></p><form id="login"><label for="email">Email</label><input id="email" type="email" autocomplete="username" required><label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required><button id="submit" type="submit">安全登录测试</button></form><button id="logout" type="button" hidden>结束测试</button><p id="status" role="status" aria-live="polite">尚未登录。</p><small>凭证仅发送至 KKT Staging Supabase Auth。此页面仅在当前页面内存中保存测试会话。请选择「结束测试」退出。不要在聊天中发送密码。</small></main><script>'use strict';const URL='https://qacmlpqtiwwmrypxnnlp.supabase.co';const KEY="sb_publishable_ksPgK2lE7Uqo-goo8GP2XQ_u_HyjRM7";let token=null;
-const requestOptions={credentials:'omit',redirect:'error',cache:'no-store',referrerPolicy:'no-referrer'};
-const $=id=>document.getElementById(id);$('login').addEventListener('submit',async e=>{e.preventDefault();$('submit').disabled=true;$('status').textContent='验证中…';const email=$('email').value.trim(),password=$('password').value;try{const r=await fetch(URL+'/auth/v1/token?grant_type=password',{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY},body:JSON.stringify({email,password}),...requestOptions});const d=await r.json();if(!r.ok||!d.access_token)throw new Error('登录未通过，请检查账号或密码。');token=d.access_token;const u=await fetch(URL+'/auth/v1/user',{headers:{apikey:KEY,Authorization:'Bearer '+token},...requestOptions});if(!u.ok||(await u.json()).id!==d.user?.id||!d.user?.id)throw new Error('会话验证失败。');$('status').textContent='Staging 账号验证成功。此测试未开放业务数据。';$('login').hidden=true;$('logout').hidden=false;}catch(_){token=null;$('status').textContent='登录失败或网络不可用。未开放任何业务资料。';}finally{$('password').value='';$('submit').disabled=false;}});$('logout').addEventListener('click',async()=>{if(token){try{await fetch(URL+'/auth/v1/logout?scope=local',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+token},...requestOptions});}catch(_){}}token=null;$('login').hidden=false;$('logout').hidden=true;$('status').textContent='测试会话已结束。';});</script></body></html>
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#172d42">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <title>KKT Android Dashboard · Staging</title>
+  <style>
+    :root{font:16px/1.5 system-ui,sans-serif;color:#172d42;background:#eff4f6}
+    *{box-sizing:border-box}
+    body{margin:0}
+    header{background:#172d42;color:#fff;padding:18px 20px}
+    .header-inner,main{width:min(100%,720px);margin:auto}
+    .header-inner{display:flex;align-items:center;justify-content:space-between;gap:14px}
+    main{padding:24px 16px max(24px,env(safe-area-inset-bottom))}
+    h1,h2,p{margin:0}
+    h1{font-size:1.65rem;line-height:1.25}
+    h2{font-size:1.125rem}
+    .muted{color:#485f73}
+    .panel,.summary article,.detail{background:#fff;border:1px solid #d3dfe7;border-radius:14px;padding:18px}
+    .panel{margin:0 auto;max-width:420px}
+    .panel p,.dashboard p{margin-top:8px}
+    .field{display:block;margin-top:16px;font-weight:650}
+    input,button{font:inherit;border-radius:8px;min-height:46px}
+    input{width:100%;border:1px solid #8b9cad;padding:9px 11px;color:inherit;background:#fff}
+    button{background:#175d53;color:#fff;border:0;padding:9px 14px;font-weight:700}
+    button:disabled{opacity:.65}
+    button:focus-visible,input:focus-visible,h1:focus-visible{outline:3px solid #177c9a;outline-offset:3px}
+    #submit{width:100%;margin-top:18px}
+    #logout{background:#fff;color:#172d42}
+    #status{margin:14px 0;min-height:1.5em}
+    .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,178px),1fr));gap:10px;margin:18px 0}
+    .summary p{font-size:1.35rem;font-weight:700}
+    .detail+.detail{margin-top:10px}
+    dl{display:grid;grid-template-columns:1fr auto;gap:8px 12px;margin:12px 0 0}
+    dd{margin:0;text-align:right}
+    @media(max-width:400px){dl{grid-template-columns:1fr;gap:3px}dd{text-align:left;margin-bottom:6px}}
+  </style>
+</head>
+<body>
+  <header><div class="header-inner">
+    <strong>KKT Dashboard · Staging</strong>
+    <button id="logout" type="button" hidden>登出</button>
+  </div></header>
+  <main>
+    <div id="login-panel" class="panel">
+      <h1>Android Staging 登录</h1>
+      <p class="muted">请使用专用的 Supabase Staging 测试账号。登录后可查看模拟 Dashboard。</p>
+      <form id="login">
+        <label class="field" for="email">测试邮箱</label>
+        <input id="email" type="email" autocomplete="username" required>
+        <label class="field" for="password">密码</label>
+        <input id="password" type="password" autocomplete="current-password" required>
+        <button id="submit" type="submit">登录 Staging</button>
+      </form>
+      <p class="muted"><small>测试会话仅保留在当前页面。PIN 尚未启用。</small></p>
+    </div>
+    <p id="status" role="status" aria-live="polite"></p>
+    <section id="dashboard" class="dashboard" aria-labelledby="overview" hidden>
+      <h1 id="overview" tabindex="-1">管理总览</h1>
+      <p class="muted">以下是演示用的模拟资料。</p>
+      <div class="summary" aria-label="模拟统计">
+        <article><h2>工程进行中</h2><p>2</p></article>
+        <article><h2>待审核进度款</h2><p>RM 12,800.00</p></article>
+        <article><h2>待收租金</h2><p>RM 2,400.00</p></article>
+      </div>
+      <section class="detail"><h2>工程进度</h2><dl>
+        <dt>模拟工程 DEMO-A</dt><dd>现场检查完成</dd>
+        <dt>模拟工程 DEMO-B</dt><dd>施工中</dd>
+      </dl></section>
+      <section class="detail"><h2>进度款</h2><dl>
+        <dt>DEMO-PC-08 · DEMO-A</dt><dd>待审核 · RM 12,800.00</dd>
+        <dt>DEMO-PC-03 · DEMO-B</dt><dd>已核证 · RM 22,500.00</dd>
+      </dl></section>
+      <section class="detail"><h2>产业租金</h2><dl>
+        <dt>模拟单位 DEMO-R01</dt><dd>待收 · RM 2,400.00</dd>
+      </dl></section>
+    </section>
+  </main>
+  <script>
+    'use strict';
+
+    const authUrl = 'https://qacmlpqtiwwmrypxnnlp.supabase.co/auth/v1';
+    const key = 'sb_publishable_ksPgK2lE7Uqo-goo8GP2XQ_u_HyjRM7';
+    const byId = id => document.getElementById(id);
+    const dashboard = byId('dashboard');
+    const loginPanel = byId('login-panel');
+    const logout = byId('logout');
+    const status = byId('status');
+    let session = null;
+    let sessionTimeout;
+
+    function request(path, options = {}) {
+      return fetch(authUrl + path, {
+        ...options,
+        headers: { apikey: key, ...options.headers },
+        credentials: 'omit',
+        redirect: 'error',
+        cache: 'no-store',
+        referrerPolicy: 'no-referrer',
+        signal: AbortSignal.timeout(15000),
+      });
+    }
+
+    function showLogin(message) {
+      clearTimeout(sessionTimeout);
+      session = null;
+      dashboard.hidden = true;
+      logout.hidden = true;
+      loginPanel.hidden = false;
+      status.textContent = message;
+    }
+
+    function checkExpiry() {
+      if (session && Date.now() >= session.expiresAt) {
+        showLogin('测试会话已到期，请重新登录。');
+      }
+    }
+
+    byId('login').addEventListener('submit', async event => {
+      event.preventDefault();
+      const submit = byId('submit');
+      if (submit.disabled || session) return;
+      submit.disabled = true;
+      status.textContent = '正在验证测试账号…';
+      const email = byId('email').value.trim();
+      const password = byId('password').value;
+      try {
+        const response = await request('/token?grant_type=password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        if (!response.ok) {
+          showLogin(response.status === 429 ? '尝试次数太多，请稍后再试。' : '登录失败，请检查测试邮箱和密码。');
+          return;
+        }
+        const result = await response.json();
+        const expiresAt = Number(result.expires_at) * 1000;
+        if (!result.user?.id || !result.access_token || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+          throw new Error('Invalid session response');
+        }
+        const verified = await request('/user', { headers: { Authorization: 'Bearer ' + result.access_token } });
+        if (!verified.ok || (await verified.json()).id !== result.user.id || expiresAt <= Date.now()) {
+          throw new Error('Session verification failed');
+        }
+
+        session = { token: result.access_token, expiresAt };
+        sessionTimeout = window.setTimeout(checkExpiry, expiresAt - Date.now());
+        loginPanel.hidden = true;
+        dashboard.hidden = false;
+        logout.hidden = false;
+        status.textContent = '已登录 Supabase Staging。';
+        byId('overview').focus();
+      } catch {
+        showLogin('无法确认 Staging 会话，请检查网络后再试。');
+      } finally {
+        byId('password').value = '';
+        submit.disabled = false;
+      }
+    });
+
+    logout.addEventListener('click', async () => {
+      if (!session || logout.disabled) return;
+      const { token } = session;
+      logout.disabled = true;
+      showLogin('正在结束测试会话…');
+      const submit = byId('submit');
+      submit.disabled = true;
+      try {
+        const response = await request('/logout?scope=local', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + token },
+        });
+        status.textContent = response.ok ? '已登出。' : '此页面已退出，服务器登出未确认。';
+      } catch {
+        status.textContent = '此页面已退出，服务器登出未确认。';
+      } finally {
+        submit.disabled = false;
+        logout.disabled = false;
+      }
+    });
+
+    document.addEventListener('visibilitychange', checkExpiry);
+    window.addEventListener('pageshow', event => {
+      if (event.persisted) checkExpiry();
+    });
+  </script>
+</body>
+</html>
