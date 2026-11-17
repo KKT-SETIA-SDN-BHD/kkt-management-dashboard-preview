@@ -21,6 +21,18 @@ table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;line
 th,td{border-bottom:1px solid #dce6df;padding:8px 4px;font-size:.9rem;text-align:right}
 th:first-child{text-align:left}thead th{color:#40574c}
 .total{display:flex;justify-content:space-between;gap:8px;padding:12px 10px;background:#e7f2eb;margin:.8rem 0 0;border-radius:8px;font-weight:700}
+
+fieldset{border:0;padding:0;margin:0 0 24px;min-inline-size:0}
+legend{font-weight:700;margin-bottom:8px;padding:0}
+.group-options{display:flex;flex-wrap:wrap;gap:8px}
+.group-options label{display:flex;gap:6px;align-items:center;min-height:44px;background:#fff;border:1px solid #c8d8cd;border-radius:8px;padding:6px 10px;cursor:pointer}
+.group-options label:has(input:checked){background:#d9ebe0;border-color:#18664e;color:#095341;font-weight:700}
+.group-options input{accent-color:#18664e}
+.group-options input:focus-visible{outline:2px solid #278564;outline-offset:2px}
+[data-payroll-group]{display:none}
+main:has(#local-site:checked) [data-payroll-group="local-site"],
+main:has(#foreign-site:checked) [data-payroll-group="foreign-site"],
+main:has(#office:checked) [data-payroll-group="office"]{display:block}
 footer{margin-top:24px}
 @media(max-width:360px){main{width:calc(100% - 24px)}.profile,details{padding:12px}th,td{font-size:.82rem}}
 </style>
@@ -28,16 +40,21 @@ footer{margin-top:24px}
 <body>
 <main>
 <header><h1>员工薪资</h1><p>KKT Staging · 合成数据 · 金额仅供页面及对账测试</p></header>
-<section aria-labelledby="staff-heading">
-<h2 id="staff-heading">员工资料</h2>
+<fieldset><legend>员工分组</legend><div class="group-options">
+<label><input type="radio" name="payroll-group" id="local-site" aria-controls="local-site-records" checked> 本地工地员工</label>
+<label><input type="radio" name="payroll-group" id="foreign-site" aria-controls="foreign-site-records"> 外籍工地员工</label>
+<label><input type="radio" name="payroll-group" id="office" aria-controls="office-records"> Office 员工</label>
+</div></fieldset>
+<div data-payroll-group="local-site" id="local-site-records">
+<section aria-labelledby="local-site-staff">
+<h2 id="local-site-staff">员工资料</h2>
 <dl class="profile">
 <div><dt>姓名</dt><dd>测试员工 A</dd></div>
 <div><dt>员工代号</dt><dd>SYNTHETIC-KKT001</dd></div>
+<div><dt>员工身份</dt><dd>马来西亚公民</dd></div>
 <div><dt>在职状态</dt><dd>在职</dd></div>
-</dl>
-</section>
-<section aria-labelledby="pay-heading">
-<h2 id="pay-heading">每月薪资</h2>
+</dl></section>
+<section aria-labelledby="local-site-pay"><h2 id="local-site-pay">每月薪资</h2>
 <details open><summary>2026 年 9 月<span>实发 RM 2,435.95</span></summary>
 <h3>收入（RM）</h3><table><tbody>
 <tr><th scope="row">基本薪资 Basic Salary</th><td>2,500.00</td></tr>
@@ -45,31 +62,113 @@ footer{margin-top:24px}
 <tr><th scope="row">加班费</th><td>120.00</td></tr>
 <tr><th scope="row">奖金和其他收入</th><td>0.00</td></tr>
 <tr><th scope="row">应发薪资</th><td>2,770.00</td></tr>
-</tbody></table>
-<h3>缴纳与扣款（RM）</h3>
+</tbody></table><h3>缴纳与扣款（RM）</h3>
 <table><thead><tr><th scope="col">项目</th><th scope="col">员工扣款</th><th scope="col">雇主缴纳</th></tr></thead><tbody>
 <tr><th scope="row">EPF / KWSP</th><td>291.50</td><td>344.50</td></tr>
 <tr><th scope="row">SOCSO / PERKESO</th><td>13.25</td><td>46.35</td></tr>
 <tr><th scope="row">EIS / SIP</th><td>5.30</td><td>5.30</td></tr>
 <tr><th scope="row">PCB / MTD</th><td>24.00</td><td>不适用</td></tr>
 <tr><th scope="row">其他扣款</th><td>0.00</td><td>不适用</td></tr>
-</tbody></table><p class="total"><span>实发薪资</span><span>RM 2,435.95</span></p></details><details><summary>2026 年 8 月<span>实发 RM 2,318.95</span></summary>
+</tbody></table><p class="total"><span>实发薪资</span><span>RM 2,435.95</span></p></details>
+<details><summary>2026 年 8 月<span>实发 RM 2,315.95</span></summary>
 <h3>收入（RM）</h3><table><tbody>
 <tr><th scope="row">基本薪资 Basic Salary</th><td>2,500.00</td></tr>
 <tr><th scope="row">津贴</th><td>150.00</td></tr>
 <tr><th scope="row">加班费</th><td>0.00</td></tr>
 <tr><th scope="row">奖金和其他收入</th><td>0.00</td></tr>
 <tr><th scope="row">应发薪资</th><td>2,650.00</td></tr>
-</tbody></table>
-<h3>缴纳与扣款（RM）</h3>
+</tbody></table><h3>缴纳与扣款（RM）</h3>
 <table><thead><tr><th scope="col">项目</th><th scope="col">员工扣款</th><th scope="col">雇主缴纳</th></tr></thead><tbody>
 <tr><th scope="row">EPF / KWSP</th><td>291.50</td><td>344.50</td></tr>
 <tr><th scope="row">SOCSO / PERKESO</th><td>13.25</td><td>46.35</td></tr>
 <tr><th scope="row">EIS / SIP</th><td>5.30</td><td>5.30</td></tr>
-<tr><th scope="row">PCB / MTD</th><td>21.00</td><td>不适用</td></tr>
+<tr><th scope="row">PCB / MTD</th><td>24.00</td><td>不适用</td></tr>
 <tr><th scope="row">其他扣款</th><td>0.00</td><td>不适用</td></tr>
-</tbody></table><p class="total"><span>实发薪资</span><span>RM 2,318.95</span></p></details>
-</section><footer><a href="./ken-mobile-staging.html">返回 Mr Ken Mobile</a></footer>
+</tbody></table><p class="total"><span>实发薪资</span><span>RM 2,315.95</span></p></details>
+</section></div>
+<div data-payroll-group="foreign-site" id="foreign-site-records">
+<section aria-labelledby="foreign-site-staff">
+<h2 id="foreign-site-staff">员工资料</h2>
+<dl class="profile">
+<div><dt>姓名</dt><dd>测试员工 B</dd></div>
+<div><dt>员工代号</dt><dd>SYNTHETIC-KKT002</dd></div>
+<div><dt>员工身份</dt><dd>外籍员工</dd></div>
+<div><dt>在职状态</dt><dd>在职</dd></div>
+</dl></section>
+<section aria-labelledby="foreign-site-pay"><h2 id="foreign-site-pay">每月薪资</h2>
+<details open><summary>2026 年 9 月<span>实发 RM 2,199.00</span></summary>
+<h3>收入（RM）</h3><table><tbody>
+<tr><th scope="row">基本薪资 Basic Salary</th><td>2,100.00</td></tr>
+<tr><th scope="row">津贴</th><td>100.00</td></tr>
+<tr><th scope="row">加班费</th><td>90.00</td></tr>
+<tr><th scope="row">奖金和其他收入</th><td>0.00</td></tr>
+<tr><th scope="row">应发薪资</th><td>2,290.00</td></tr>
+</tbody></table><h3>缴纳与扣款（RM）</h3>
+<table><thead><tr><th scope="col">项目</th><th scope="col">员工扣款</th><th scope="col">雇主缴纳</th></tr></thead><tbody>
+<tr><th scope="row">EPF / KWSP</th><td>44.00</td><td>44.00</td></tr>
+<tr><th scope="row">SOCSO / PERKESO</th><td>27.00</td><td>38.00</td></tr>
+<tr><th scope="row">EIS / SIP</th><td>不适用</td><td>不适用</td></tr>
+<tr><th scope="row">PCB / MTD</th><td>20.00</td><td>不适用</td></tr>
+<tr><th scope="row">其他扣款</th><td>0.00</td><td>不适用</td></tr>
+</tbody></table><p class="total"><span>实发薪资</span><span>RM 2,199.00</span></p></details>
+<details><summary>2026 年 8 月<span>实发 RM 2,109.00</span></summary>
+<h3>收入（RM）</h3><table><tbody>
+<tr><th scope="row">基本薪资 Basic Salary</th><td>2,100.00</td></tr>
+<tr><th scope="row">津贴</th><td>100.00</td></tr>
+<tr><th scope="row">加班费</th><td>0.00</td></tr>
+<tr><th scope="row">奖金和其他收入</th><td>0.00</td></tr>
+<tr><th scope="row">应发薪资</th><td>2,200.00</td></tr>
+</tbody></table><h3>缴纳与扣款（RM）</h3>
+<table><thead><tr><th scope="col">项目</th><th scope="col">员工扣款</th><th scope="col">雇主缴纳</th></tr></thead><tbody>
+<tr><th scope="row">EPF / KWSP</th><td>44.00</td><td>44.00</td></tr>
+<tr><th scope="row">SOCSO / PERKESO</th><td>27.00</td><td>38.00</td></tr>
+<tr><th scope="row">EIS / SIP</th><td>不适用</td><td>不适用</td></tr>
+<tr><th scope="row">PCB / MTD</th><td>20.00</td><td>不适用</td></tr>
+<tr><th scope="row">其他扣款</th><td>0.00</td><td>不适用</td></tr>
+</tbody></table><p class="total"><span>实发薪资</span><span>RM 2,109.00</span></p></details>
+</section></div>
+<div data-payroll-group="office" id="office-records">
+<section aria-labelledby="office-staff">
+<h2 id="office-staff">员工资料</h2>
+<dl class="profile">
+<div><dt>姓名</dt><dd>测试员工 C</dd></div>
+<div><dt>员工代号</dt><dd>SYNTHETIC-KKT033</dd></div>
+<div><dt>员工身份</dt><dd>永久居民</dd></div>
+<div><dt>在职状态</dt><dd>在职</dd></div>
+</dl></section>
+<section aria-labelledby="office-pay"><h2 id="office-pay">每月薪资</h2>
+<details open><summary>2026 年 9 月<span>实发 RM 4,035.50</span></summary>
+<h3>收入（RM）</h3><table><tbody>
+<tr><th scope="row">基本薪资 Basic Salary</th><td>4,300.00</td></tr>
+<tr><th scope="row">津贴</th><td>150.00</td></tr>
+<tr><th scope="row">加班费</th><td>0.00</td></tr>
+<tr><th scope="row">奖金和其他收入</th><td>180.00</td></tr>
+<tr><th scope="row">应发薪资</th><td>4,630.00</td></tr>
+</tbody></table><h3>缴纳与扣款（RM）</h3>
+<table><thead><tr><th scope="col">项目</th><th scope="col">员工扣款</th><th scope="col">雇主缴纳</th></tr></thead><tbody>
+<tr><th scope="row">EPF / KWSP</th><td>485.00</td><td>575.00</td></tr>
+<tr><th scope="row">SOCSO / PERKESO</th><td>22.50</td><td>79.00</td></tr>
+<tr><th scope="row">EIS / SIP</th><td>9.00</td><td>9.00</td></tr>
+<tr><th scope="row">PCB / MTD</th><td>78.00</td><td>不适用</td></tr>
+<tr><th scope="row">其他扣款</th><td>0.00</td><td>不适用</td></tr>
+</tbody></table><p class="total"><span>实发薪资</span><span>RM 4,035.50</span></p></details>
+<details><summary>2026 年 8 月<span>实发 RM 3,855.50</span></summary>
+<h3>收入（RM）</h3><table><tbody>
+<tr><th scope="row">基本薪资 Basic Salary</th><td>4,300.00</td></tr>
+<tr><th scope="row">津贴</th><td>150.00</td></tr>
+<tr><th scope="row">加班费</th><td>0.00</td></tr>
+<tr><th scope="row">奖金和其他收入</th><td>0.00</td></tr>
+<tr><th scope="row">应发薪资</th><td>4,450.00</td></tr>
+</tbody></table><h3>缴纳与扣款（RM）</h3>
+<table><thead><tr><th scope="col">项目</th><th scope="col">员工扣款</th><th scope="col">雇主缴纳</th></tr></thead><tbody>
+<tr><th scope="row">EPF / KWSP</th><td>485.00</td><td>575.00</td></tr>
+<tr><th scope="row">SOCSO / PERKESO</th><td>22.50</td><td>79.00</td></tr>
+<tr><th scope="row">EIS / SIP</th><td>9.00</td><td>9.00</td></tr>
+<tr><th scope="row">PCB / MTD</th><td>78.00</td><td>不适用</td></tr>
+<tr><th scope="row">其他扣款</th><td>0.00</td><td>不适用</td></tr>
+</tbody></table><p class="total"><span>实发薪资</span><span>RM 3,855.50</span></p></details>
+</section></div>
+<footer><a href="./ken-mobile-staging.html">返回 Mr Ken Mobile</a></footer>
 </main>
 </body>
 </html>
