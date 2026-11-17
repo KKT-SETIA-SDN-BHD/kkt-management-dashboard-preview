@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <title>Mr Ken Mobile · 工程资料</title>
+  <link rel="stylesheet" href="./ken-mobile-staging.css">
+  <script src="./ken-mobile-staging.js" defer></script>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">KKT · Staging</p>
+      <h1>工程资料</h1>
+      <p>用已授权的 Mr Ken 账号登录，查看工程原件核对记录。</p>
+    </header>
+
+    <form id="signin">
+      <label for="email">登录邮箱</label>
+      <input id="email" type="email" maxlength="320" autocomplete="username" required>
+      <label for="password">密码</label>
+      <input id="password" type="password" maxlength="256" autocomplete="current-password" required>
+      <button id="enter" type="submit">登录</button>
+    </form>
+
+    <p id="status" role="status" aria-live="polite"></p>
+    <section id="results" aria-labelledby="heading" hidden>
+      <div class="bar">
+        <h2 id="heading">项目原件记录</h2>
+        <button id="signout" type="button">登出</button>
+      </div>
+      <ul id="updates"></ul>
+    </section>
+  </main>
+</body>
+</html>
