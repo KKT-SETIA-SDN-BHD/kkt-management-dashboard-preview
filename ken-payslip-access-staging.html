@@ -2,13 +2,13 @@
 <html lang="zh-Hans"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; img-src data:; style-src 'unsafe-inline'; script-src 'sha256-/F6+UzYA5wZbeOsCPcABUvwJZ36MxFb95XyUtEBqZQU='; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; img-src data:; style-src 'unsafe-inline'; script-src 'sha256-C2kTyDQc7g2fQlqJdKKo69sQ9AiKICXhbRkOwoRE1fs='; base-uri 'none'; form-action 'none'">
 <title>KKT 工资单查阅与列印</title>
 <style>
 :root{font-family:system-ui,sans-serif;color:#15273c;background:#f0f3f8}*{box-sizing:border-box}
 main{max-width:760px;margin:30px auto;padding:0 16px}h1{font-size:1.7rem;margin:8px 0}.muted{color:#52617a}a{color:#254878}
 section,.controls,.payslip{background:white;border:1px solid #ccd6e4;border-radius:12px;padding:16px;margin:14px 0}
-label{display:block;margin:10px 0 4px}input,button{font:inherit;min-height:42px;padding:7px 11px;border-radius:8px}
+.profile-details{display:grid;grid-template-columns:repeat(auto-fit,minmax(138px,1fr));gap:9px 14px}.profile-details dd{margin:0;overflow-wrap:anywhere}.profile-details dt{font-size:.8rem;color:#52617a}.profile-detail{margin:0}.profile-panel{border-bottom:1px solid #dae3ef;padding-bottom:10px;margin-bottom:15px}.profile-panel h2{font-size:1.1rem}.profile-panel h3{font-size:1rem}label{display:block;margin:10px 0 4px}input,button,select{font:inherit;min-height:42px;padding:7px 11px;border-radius:8px}
 input{border:1px solid #7385a0;max-width:100%}input[type=checkbox]{min-height:auto}button{background:#253f68;color:white;border:0;cursor:pointer}
 button.secondary{background:#e5edf8;color:#243e62}button:disabled{opacity:.6;cursor:default}
 .flex{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.record{border-top:1px solid #dee5ef;padding:11px 0;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
@@ -31,6 +31,16 @@ button.secondary{background:#e5edf8;color:#243e62}button:disabled{opacity:.6;cur
 <p id="status" role="status" aria-live="polite"></p>
 <section id="workspace" hidden>
 <div class="flex"><strong id="viewer"></strong><button id="logout" type="button" class="secondary">登出</button></div>
+<div class="profile-panel">
+<h2>员工资料与 PDF</h2>
+<label id="profile-picker" hidden>选择员工 <select id="profile-select"></select></label>
+<dl id="profile-details" class="profile-details"></dl>
+<h3>已归档 PDF</h3>
+<div id="employee-documents"></div>
+<p id="pdf-status" class="muted" role="status"></p>
+<p id="pdf-links" class="flex" hidden><a id="pdf-open" target="_blank" rel="noopener noreferrer">打开 PDF</a><a id="pdf-download">下载 PDF</a></p>
+</div>
+<h2>每月工资单</h2>
 <form id="lookup" class="flex"><label for="month">工资月份</label><input id="month" type="month" required><button type="submit" class="secondary">查看月份</button></form>
 <div id="batch" class="flex" hidden><label><input id="select-all" type="checkbox">全选本月</label><button id="print-selected" type="button">列印所选</button></div>
 <p id="print-help" class="muted">列印时也可选择另存为 PDF。受保护的链接只会向有权限的账号显示工资单。</p>
@@ -63,13 +73,16 @@ let role = "";
 let records = [];
 let busy = false;
 let sharedView = false;
+let profiles = [];
+let pdfUrl = "";
+const groupNames = {local_site: "本地工地员工", foreign_site: "外籍工地员工", office: "Office 员工", unconfirmed: "待确认"};
 const selections = new Set();
 const printOut = get("print-output");
 const say = message => { get("status").textContent = message; };
 
 function setBusy(value) {
   busy = value;
-  const controls = document.querySelectorAll("#login button, #logout, #lookup button");
+  const controls = document.querySelectorAll("#login button, #logout, #lookup button, #profile-select");
   for (const control of controls) control.disabled = value;
   get("print-selected").disabled = value || selections.size === 0;
 }
@@ -106,6 +119,13 @@ function clearSession() {
   session = "";
   role = "";
   clearRecords();
+  profiles = [];
+  get("profile-select").replaceChildren();
+  get("profile-details").replaceChildren();
+  get("employee-documents").replaceChildren();
+  get("profile-picker").hidden = true;
+  clearPdf();
+  get("pdf-status").textContent = "";
   get("workspace").hidden = true;
   get("login-panel").hidden = false;
 }
@@ -159,6 +179,96 @@ function syncSelections() {
   selectAll.indeterminate = selections.size > 0 && !selectAll.checked;
   get("print-selected").disabled = busy || selections.size === 0;
 }
+function clearPdf() {
+  if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+  pdfUrl = "";
+  get("pdf-links").hidden = true;
+  get("pdf-open").removeAttribute("href");
+  get("pdf-download").removeAttribute("href");
+  get("pdf-download").removeAttribute("download");
+}
+function profileValue(name, value) {
+  const field = document.createElement("div");
+  const label = document.createElement("dt");
+  const detail = document.createElement("dd");
+  label.textContent = name;
+  detail.textContent = value || "未填写";
+  field.append(label, detail);
+  get("profile-details").append(field);
+}
+async function readPdf(file) {
+  clearPdf();
+  const status = get("pdf-status");
+  status.textContent = "正在读取 PDF…";
+  setBusy(true);
+  try {
+    if (!/^[a-f0-9-]{36}\/[a-f0-9-]{36}\.pdf$/.test(file.object_path)) throw Error("Invalid PDF path");
+    const endpoint = project + "/storage/v1/object/authenticated/kkt-employee-pdfs/" + file.object_path;
+    const response = await fetch(endpoint, {
+      headers: {apikey: key, Authorization: "Bearer " + session},
+      cache: "no-store", credentials: "omit", redirect: "error", signal: AbortSignal.timeout(15000)
+    });
+    if (!response.ok) throw Error(String(response.status));
+    const blob = await response.blob();
+    if (blob.size > 10485760 || await blob.slice(0, 5).text() !== "%PDF-") throw Error("Invalid PDF");
+    pdfUrl = URL.createObjectURL(new Blob([blob], {type: "application/pdf"}));
+    get("pdf-open").href = pdfUrl;
+    get("pdf-download").href = pdfUrl;
+    get("pdf-download").download = file.document_id + ".pdf";
+    get("pdf-links").hidden = false;
+    status.textContent = "PDF 已就绪。";
+  } catch (error) {
+    if (error.message === "401") handleFailure(error, "");
+    else status.textContent = "无法读取此 PDF。文件可能尚未归档，或当前账号无权读取。";
+  } finally { setBusy(false); }
+}
+async function showProfile(reference) {
+  clearPdf();
+  get("profile-details").replaceChildren();
+  get("employee-documents").replaceChildren();
+  get("pdf-status").textContent = "";
+  const row = profiles.find(profile => profile.employee_ref === reference);
+  if (!row) {
+    get("pdf-status").textContent = "此账号没有可查阅的员工资料。";
+    return;
+  }
+  profileValue("员工代号", row.employee_ref);
+  profileValue("姓名", row.preferred_name);
+  profileValue("员工分组", groupNames[row.payroll_group]);
+  profileValue("在职状态", {active: "在职", inactive: "离职"}[row.employment_state] || "待确认");
+  profileValue("入职日期", row.joined_on);
+  if (row.ended_on) profileValue("离职日期", row.ended_on);
+  const files = await rpc("kkt_payroll_employee_documents", {target_employee: reference});
+  if (!files.length) get("pdf-status").textContent = "暂无此账号可查阅的已归档 PDF。";
+  for (const file of files) get("employee-documents").append(makeButton(file.title, () => readPdf(file)));
+}
+async function loadProfiles() {
+  profiles = [];
+  const size = 150;
+  for (let offset = 0;; offset += size) {
+    const rows = await rpc("kkt_payroll_employee_profile", {}, "?limit=" + size + "&offset=" + offset);
+    if (!Array.isArray(rows)) throw Error("Unexpected profile response");
+    profiles.push(...rows);
+    if (rows.length < size) break;
+  }
+  const picker = get("profile-select");
+  picker.replaceChildren();
+  for (const row of profiles) {
+    const option = document.createElement("option");
+    option.value = row.employee_ref;
+    option.textContent = [row.employee_ref, row.preferred_name].filter(Boolean).join(" · ");
+    picker.append(option);
+  }
+  get("profile-picker").hidden = role !== "payroll_admin" || profiles.length < 2;
+  await showProfile(picker.value);
+}
+get("profile-select").addEventListener("change", async event => {
+  if (busy) return;
+  setBusy(true);
+  try { await showProfile(event.target.value); }
+  catch (error) { handleFailure(error, "无法读取员工文件，请稍后重试。"); }
+  finally { setBusy(false); }
+});
 async function showMonth(selectedId = null) {
   clearRecords();
   sharedView = Boolean(selectedId);
@@ -265,6 +375,7 @@ get("login").addEventListener("submit", async event => {
     get("login-panel").hidden = true;
     get("workspace").hidden = false;
     await showMonth(sharedId);
+    await loadProfiles();
   } catch (error) {
     handleFailure(error, "暂时无法载入工资单，请重试。");
   } finally { setBusy(false); }
