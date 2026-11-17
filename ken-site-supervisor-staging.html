@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; img-src blob:; style-src 'unsafe-inline'; script-src 'sha256-jchJHLspH5m2MxY9pLZvfVBJQl9Hy9ML+1aUXvTfhS4='; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; img-src blob:; style-src 'unsafe-inline'; script-src 'sha256-Kg1bKyhJFsFCHB5RHZzGOVIATic+Vc5A6++5Wps3tnc='; base-uri 'none'; form-action 'none'">
 <title>KKT Site Supervisor</title>
 <style>
 *{box-sizing:border-box}html{color-scheme:light}body{margin:0;background:#eef4f1;color:#152d24;font:16px/1.5 system-ui,sans-serif}
@@ -32,14 +32,20 @@ a{color:#15533e;text-underline-offset:3px}summary{font-weight:700;cursor:pointer
 <div class="two"><div><label for="project">工程</label><select id="project" required></select></div>
 <div><label for="employee">工人</label><select id="employee" required></select></div></div>
 <label for="month">工卡月份</label><input id="month" type="month" required>
-<div class="two"><div><label for="front">1. 拍工卡正面</label><input id="front" type="file" accept="image/*" capture="environment" required></div>
-<div><label for="back">2. 拍工卡反面</label><input id="back" type="file" accept="image/*" capture="environment" required></div></div>
-<details open><summary>每日工时（人工读卡录入）</summary>
-<p class="muted">按当天输入小时与分钟，例如 8:30。空白表示未录入，0:00 表示当天没有工时。</p>
+<p class="muted">每次只拍同一工人的一张月卡。请把卡放平，拍清四边和字迹，避免多张卡重叠。</p>
+<div class="two"><div><label for="front">1. 拍封面（姓名、员工代号、月份、预支）</label><input id="front" type="file" accept="image/*" capture="environment" required>
+<label for="front-rotation">封面旋转</label><select id="front-rotation" aria-label="封面顺时针旋转"><option value="0">不旋转</option><option value="90">顺时针 90°</option><option value="180">180°</option><option value="270">顺时针 270°</option></select></div>
+<div><label for="back-mode">2. 内页拍法</label><select id="back-mode"><option value="full">整张内页（上、下半月同框）</option><option value="split">上、下半月分开拍</option></select>
+<label for="back" id="back-label">拍整张内页（第 1 日至月底）</label><input id="back" type="file" accept="image/*" capture="environment" required>
+<label for="back-rotation">内页旋转</label><select id="back-rotation" aria-label="内页顺时针旋转"><option value="0">不旋转</option><option value="90">顺时针 90°</option><option value="180">180°</option><option value="270">顺时针 270°</option></select>
+<div id="late-photo" hidden><label for="late">拍下半月（第 16 日至月底）</label><input id="late" type="file" accept="image/*" capture="environment" disabled>
+<label for="late-rotation">下半月旋转</label><select id="late-rotation" aria-label="下半月顺时针旋转"><option value="0">不旋转</option><option value="90">顺时针 90°</option><option value="180">180°</option><option value="270">顺时针 270°</option></select></div></div></div>
+<details open><summary>每日工时（按工卡工时栏录入）</summary>
+<p class="muted">卡上写 10，可直接填 10 小时。也可输入 8:30。横线或模糊格先留空，只有确认无工时才填 0。</p>
 <div id="days" class="hours"></div>
 <p><strong id="total-hours">合计 0:00</strong></p>
 </details>
-<div class="two"><div><label for="advance">预支 Advance（RM）</label><input id="advance" type="number" min="0" max="999999" step=".01" inputmode="decimal" placeholder="无记录可留空"></div>
+<div class="two"><div><label for="advance">封面预支 Advance（RM）</label><input id="advance" type="number" min="0" max="999999" step=".01" inputmode="decimal" placeholder="无记录可留空"></div>
 <div><label for="notes">补充资料</label><textarea id="notes" maxlength="120" rows="2"></textarea></div></div>
 <div class="flex"><button id="preview" type="button" class="secondary">生成 PDF 预览</button><button>提交办公室</button></div>
 <a id="pdf-open" hidden target="_blank" rel="noopener noreferrer">打开一页 PDF</a>
@@ -118,12 +124,31 @@ function fillWorkers() {
 function hourText(minutes) {
   return Math.floor(minutes/60)+":"+String(minutes%60).padStart(2,"0");
 }
+function parseDailyTime(raw) {
+  const text=String(raw).trim();
+  if(!text)return null;
+  const match=text.match(/^(\d{1,2})(?::([0-5]\d))?$/);
+  const minutes=match?Number(match[1])*60+Number(match[2]||0):-1;
+  return minutes>=0&&minutes<=1440?minutes:NaN;
+}
 function updateTotal() {
-  const total=[...get("days").querySelectorAll("input")].reduce((sum,input)=>{
-    const m=input.value.trim().match(/^(\d{1,2}):([0-5]\d)$/);
-    return sum+(m?Number(m[1])*60+Number(m[2]):0);
-  },0);
-  get("total-hours").textContent = "合计 "+hourText(total);
+  let total=0, invalid=false;
+  for(const input of get("days").querySelectorAll("input")) {
+    const minutes=parseDailyTime(input.value);
+    if(Number.isNaN(minutes))invalid=true;
+    else if(minutes!==null)total+=minutes;
+  }
+  get("total-hours").textContent=invalid?"请修正无效工时":"合计 "+hourText(total);
+}
+function syncPhotoMode(clear=false) {
+  const split=get("back-mode").value==="split";
+  get("back-label").textContent=split?"拍上半月（第 1 至 15 日）":"拍整张内页（第 1 日至月底）";
+  get("late-photo").hidden=!split;
+  get("late").disabled=!split;
+  get("late").required=split;
+  if(clear)get("back").value="";
+  if(clear||!split)get("late").value="";
+  resetPreview();
 }
 function buildDays() {
   const value=get("month").value;
@@ -146,26 +171,32 @@ function cardData() {
   if(workers.length!==1)throw Error("worker");
   const daily={};
   for(const input of get("days").querySelectorAll("input")){
-    if(!input.value.trim())continue;
-    const m=input.value.trim().match(/^(\d{1,2}):([0-5]\d)$/);
-    const minutes=m?Number(m[1])*60+Number(m[2]):-1;
-    if(minutes<0||minutes>1440){input.focus();throw Error("hours");}
+    const minutes=parseDailyTime(input.value);
+    if(minutes===null)continue;
+    if(Number.isNaN(minutes)){input.focus();throw Error("hours");}
     daily[input.name]=minutes;
   }
   if(!Object.keys(daily).length)throw Error("hours");
   return {worker:workers[0],month:get("month").value,daily,
     advance:get("advance").value===""?null:Number(get("advance").value),notes:get("notes").value.trim(),
-    project:scope.projects.find(p=>p.id===get("project").value),front:get("front").files[0],back:get("back").files[0]};
+    project:scope.projects.find(p=>p.id===get("project").value),front:get("front").files[0],back:get("back").files[0],
+    late:get("back-mode").value==="split"?get("late").files[0]:null,
+    frontRotation:Number(get("front-rotation").value),backRotation:Number(get("back-rotation").value),lateRotation:Number(get("late-rotation").value)};
 }
 async function thumbnail(file) {
   if(!file?.type.startsWith("image/")||file.size>20000000)throw Error("image");
   return createImageBitmap(file);
 }
-function paintFit(ctx,img,x,y,w,h) {
-  const scale=Math.min(w/img.width,h/img.height);
+function paintFit(ctx,img,x,y,w,h,rotation=0) {
+  const swap=rotation===90||rotation===270;
+  const scale=Math.min(w/(swap?img.height:img.width),h/(swap?img.width:img.height));
   const dw=img.width*scale,dh=img.height*scale;
   ctx.fillStyle="#f0f4f1";ctx.fillRect(x,y,w,h);
-  ctx.drawImage(img,x+(w-dw)/2,y+(h-dh)/2,dw,dh);
+  ctx.save();
+  ctx.translate(x+w/2,y+h/2);
+  ctx.rotate(rotation*Math.PI/180);
+  ctx.drawImage(img,-dw/2,-dh/2,dw,dh);
+  ctx.restore();
 }
 function writeCanvasText(ctx,text,maxWidth) {
   const lines=[];let line="";
@@ -204,9 +235,10 @@ function jpegPdf(jpeg,width,height) {
 }
 async function makeCardPdf(data) {
   const front=await thumbnail(data.front);
-  let back;
+  let back, late;
   try {
     back=await thumbnail(data.back);
+    if(data.late)late=await thumbnail(data.late);
     const c=document.createElement("canvas");c.width=1240;c.height=1754;
     const ctx=c.getContext("2d",{alpha:false});ctx.fillStyle="#fff";ctx.fillRect(0,0,c.width,c.height);
     ctx.fillStyle="#164e3b";ctx.fillRect(0,0,c.width,155);
@@ -215,8 +247,14 @@ async function makeCardPdf(data) {
     ctx.fillStyle="#183a2e";ctx.font="bold 28px sans-serif";
     ctx.fillText(data.worker.ref+" · "+(data.worker.name||""),56,208,1128);
     ctx.font="24px sans-serif";ctx.fillText(data.month+" · "+data.project.name,56,245,1128);
-    ctx.fillText("工卡正面",56,294);ctx.fillText("工卡反面",634,294);
-    paintFit(ctx,front,56,312,550,800);paintFit(ctx,back,634,312,550,800);
+    ctx.fillText("工卡封面",56,294);
+    ctx.fillText(late?"上半月（1–15 日）":"工卡内页（1 日至月底）",634,294);
+    paintFit(ctx,front,56,312,550,800,data.frontRotation);
+    if(late){
+      paintFit(ctx,back,634,312,550,370,data.backRotation);
+      ctx.fillStyle="#183a2e";ctx.fillText("下半月（16 日至月底）",634,712);
+      paintFit(ctx,late,634,730,550,382,data.lateRotation);
+    }else paintFit(ctx,back,634,312,550,800,data.backRotation);
     ctx.fillStyle="#183a2e";ctx.font="bold 26px sans-serif";ctx.fillText("每日工时（小时:分钟）",56,1162);
     ctx.font="22px sans-serif";
     for(const [day,m] of Object.entries(data.daily)){
@@ -231,7 +269,7 @@ async function makeCardPdf(data) {
     const raster=await new Promise(resolve=>c.toBlob(resolve,"image/jpeg",.84));
     if(!raster)throw Error("image");
     return jpegPdf(new Uint8Array(await raster.arrayBuffer()),c.width,c.height);
-  } finally {front.close();back?.close();}
+  } finally {front.close();back?.close();late?.close();}
 }
 function resetPreview(){
   if(pdfUrl)URL.revokeObjectURL(pdfUrl);
@@ -244,7 +282,7 @@ function showPreview(pdf){
 function clearSession() {
   session="";scope={projects:[],workers:[],office:false};queue=null;
   resetPreview();get("workspace").hidden=true;get("login-panel").hidden=false;
-  get("card-form").reset();get("cash-form").reset();get("office-items").replaceChildren();get("office-count").textContent="";
+  get("card-form").reset();syncPhotoMode();get("cash-form").reset();get("office-items").replaceChildren();get("office-count").textContent="";
   get("month").value=today.slice(0,7);get("review-month").value=today.slice(0,7);get("date").value=today;
   buildDays();cardId=null;cardIdentity="";cashId=null;cashIdentity="";
 }
@@ -260,8 +298,16 @@ function downloadBlob(blob, name) {
   link.href=url;link.download=name;link.click();
   setTimeout(()=>URL.revokeObjectURL(url),30000);
 }
-get("project").addEventListener("change",fillWorkers);
-get("month").addEventListener("change",()=>{get("days").replaceChildren();buildDays();});
+function clearCardInputs() {
+  for(const id of ["front","back","late","advance","notes"])get(id).value="";
+  for(const id of ["front-rotation","back-rotation","late-rotation"])get(id).value="0";
+  get("days").replaceChildren();buildDays();resetPreview();
+}
+get("project").addEventListener("change",()=>{fillWorkers();clearCardInputs();});
+get("employee").addEventListener("change",clearCardInputs);
+get("month").addEventListener("change",clearCardInputs);
+get("back-mode").addEventListener("change",()=>syncPhotoMode(true));
+get("card-form").addEventListener("input",resetPreview);
 get("days").addEventListener("input",updateTotal);
 clearSession();
 
@@ -302,7 +348,7 @@ async function processCard(submit){
     const digest=[...new Uint8Array(await crypto.subtle.digest("SHA-256",await pdf.arrayBuffer()))].map(x=>x.toString(16).padStart(2,"0")).join("");
     await api("storage/v1/object/kkt-site-intake-staging/"+path,pdf,"POST","application/pdf",{"x-upsert":"true"});
     await rpc("submit_card",{card_id:cardId,checksum:digest});
-    get("front").value="";get("back").value="";
+    get("front").value="";get("back").value="";get("late").value="";
     say("工卡已交办公室复核，OneDrive 归档状态待处理。");
   }catch(error){
     if(error.message==="hours")say("请输入至少一天有效工时，例如 8:30。");
