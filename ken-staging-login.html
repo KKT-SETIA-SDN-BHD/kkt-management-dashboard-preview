@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; style-src 'unsafe-inline'; script-src 'sha256-1cYAMBTESlKdrejqfBqTR/W9xzbLROhrQ9I3gThhAV8='; form-action 'none'; base-uri 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; style-src 'unsafe-inline'; script-src 'sha256-/TFYs+yraop3irNG7+UPljrXeTcD1pVyXfkz3Ja9dq8='; form-action 'none'; base-uri 'none'; object-src 'none'">
 <title>KKT 外劳管理测试</title>
 <style>
 :root{color-scheme:light;font-family:system-ui,-apple-system,sans-serif;color:#142923;background:#edf3ef}
@@ -15,6 +15,23 @@ input,select{width:100%;background:#fff;border:1px solid #6e8279}button{backgrou
 button.secondary{color:#075747;background:#e6f2ec}.controls{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}.dates{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:10px}
 ul{padding:0;list-style:none}li{margin:8px 0;overflow-wrap:anywhere}#employees button{width:100%;text-align:left;overflow-wrap:anywhere}a{color:#075747}
 #message{min-height:1.5em}button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:3px solid #268163;outline-offset:2px}
+
+[hidden]{display:none!important}
+.record-header{border-top:4px solid #075747;background:#f0f7f3;padding:14px;margin:0 0 16px;border-radius:8px}
+.record-header strong,.record-header span{display:block;overflow-wrap:anywhere}
+.record-header strong{font-size:1.125rem}
+.record-header span{color:#425a50;margin-top:4px}
+.record-cards{display:grid;gap:12px;margin:0}
+.record-cards li{margin:0}
+.document-card{border:1px solid #ccdcd4;border-radius:12px;padding:14px}
+.document-card h3{margin:0 0 6px;font-size:1rem}
+.document-card p{margin:0;color:#425a50}
+.document-card dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,125px),1fr));gap:10px 14px;margin:12px 0 0}
+.document-card dt{font-size:.8125rem;font-weight:650;color:#425a50}
+.document-card dd{margin:4px 0 0;font-weight:650}
+.document-card button{margin-top:12px}
+.document-card .record-urgent{color:#943423}
+@media(max-width:380px){body{padding:12px}section,form#login{padding:14px}}
 </style>
 </head>
 <body>
@@ -61,8 +78,9 @@ ul{padding:0;list-style:none}li{margin:8px 0;overflow-wrap:anywhere}#employees b
 </form>
 </section>
 <section id="document-panel" aria-labelledby="document-title" hidden>
-<h2 id="document-title">证件与工卡登记</h2>
-<ul id="document-records"></ul>
+<h2 id="document-title">外劳证件档案</h2>
+<div class="record-header"><strong id="document-worker-name"></strong><span id="document-worker-reference"></span></div>
+<ul id="document-records" class="record-cards"></ul>
 <p id="document-info"></p>
 <form id="document-form" method="post" autocomplete="off">
 <label for="source-document">已索引的 HR 文件</label>
@@ -154,6 +172,8 @@ function clearForm() {
   staffRef.setCustomValidity("");
   documentPanel.hidden = true;
   documentRecords.replaceChildren();
+  byId("document-worker-name").textContent = "";
+  byId("document-worker-reference").textContent = "";
   sourceDocument.replaceChildren();
   documentForm.reset();
   employeeForm.reset();
@@ -173,6 +193,8 @@ async function edit(row) {
   syncEndDate();
   endOn.value = row.ended_on || "";
   byId("edit-title").textContent = "编辑模拟员工";
+  byId("document-worker-name").textContent = row.preferred_name || "未填写姓名";
+  byId("document-worker-reference").textContent = [row.employee_ref, staffLabels[row.employment_state]].filter(Boolean).join(" · ");
   staffName.focus();
   documentPanel.hidden = true;
   documentForm.reset();
@@ -225,6 +247,17 @@ function syncVerification() {
   if (verification.disabled) verification.value = "NOTICE_ONLY";
 }
 
+function documentDetail(details, label, value, urgent = false) {
+  const field = document.createElement("div");
+  const term = document.createElement("dt");
+  const description = document.createElement("dd");
+  term.textContent = label;
+  description.textContent = value;
+  if (urgent) description.className = "record-urgent";
+  field.append(term, description);
+  details.append(field);
+}
+
 async function readDocuments() {
   const register = await rpc("kkt_hr_document_register", {...target, staff_ref: staffRef.value}, token);
   documentRecords.replaceChildren();
@@ -236,15 +269,29 @@ async function readDocuments() {
     sourceDocument.append(option);
   }
   for (const item of register.records) {
-    const date = item.expires_on || "未填写到期日";
-    const label = [item.title, currentLabel(kind, item.document_type), date,
-      reminderLabels[item.review_state] || currentLabel(verification, item.verification_status)].filter(Boolean).join(" · ");
+    const card = document.createElement("article");
+    card.className = "document-card";
+    const title = document.createElement("h3");
+    const file = document.createElement("p");
+    const details = document.createElement("dl");
+    title.textContent = currentLabel(kind, item.document_type) || "证件";
+    file.textContent = item.title || "未命名来源文件";
+    documentDetail(details, "到期日", item.expires_on || "未填写");
+    documentDetail(details, "核实状态", currentLabel(verification, item.verification_status) || "未填写");
+    documentDetail(details, "到期与复核", reminderLabels[item.review_state] || "未评估",
+      ["EXPIRED", "DUE_TODAY", "DUE_WITHIN_30_DAYS"].includes(item.review_state));
+    card.append(title, file, details);
+    if (!Array.from(sourceDocument.options).some(option => option.value === item.document_id)) {
+      listItem(documentRecords, card);
+      continue;
+    }
     const button = document.createElement("button");
     button.className = "secondary";
     button.type = "button";
-    button.textContent = label;
+    button.textContent = "编辑登记";
+    button.setAttribute("aria-label", "编辑登记 · " + title.textContent + " · " + file.textContent);
     button.addEventListener("click", () => {
-      if (busy || ![...sourceDocument.options].some(option => option.value === item.document_id)) return;
+      if (busy) return;
       sourceDocument.value = item.document_id;
       kind.value = item.document_type;
       verification.value = item.verification_status;
@@ -252,7 +299,8 @@ async function readDocuments() {
       syncVerification();
       expiry.focus();
     });
-    listItem(documentRecords, button);
+    card.append(button);
+    listItem(documentRecords, card);
   }
   if (!documentRecords.children.length) listItem(documentRecords, "暂无已登记证件");
   documentForm.hidden = !register.sources.length;
