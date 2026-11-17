@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; img-src blob:; style-src 'unsafe-inline'; script-src 'sha256-jchJHLspH5m2MxY9pLZvfVBJQl9Hy9ML+1aUXvTfhS4='; base-uri 'none'; form-action 'none'">
+<title>KKT Site Supervisor</title>
+<style>
+*{box-sizing:border-box}html{color-scheme:light}body{margin:0;background:#eef4f1;color:#152d24;font:16px/1.5 system-ui,sans-serif}
+main{width:min(100% - 30px,710px);margin:28px auto 48px}header{border-top:5px solid #1f644c;padding:16px 0 6px}h1,h2,h3,p{margin:0 0 10px}h1{font-size:clamp(1.65rem,5vw,2.35rem)}h2{font-size:1.2rem}h3{font-size:1.05rem;margin-top:12px}
+section,details{background:#fff;border:1px solid #c6d8cd;border-radius:12px;padding:15px;margin:12px 0}
+label{display:block;font-weight:650;margin:9px 0 3px}input,select,textarea,button{font:inherit}
+input,select,textarea{width:100%;padding:8px 10px;border:1px solid #82998c;border-radius:7px;background:#fff;color:inherit;min-height:44px}
+button{min-height:44px;padding:8px 13px;border:0;border-radius:7px;background:#15533e;color:#fff;font-weight:700;cursor:pointer}
+button:disabled{opacity:.58;cursor:wait}.secondary{background:#e2eee7;color:#15533e}
+a{color:#15533e;text-underline-offset:3px}summary{font-weight:700;cursor:pointer}.muted{color:#425d50}form>button,.flex{margin-top:10px}.flex{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:8px 12px}.hours{display:grid;grid-template-columns:repeat(auto-fit,minmax(75px,1fr));gap:5px 8px}.hours label{font-size:.8rem;margin:4px 0}.hours input{padding:6px}
+#status{position:sticky;top:4px;z-index:1;background:#e1efe6;border:1px solid #b8d1c0;padding:8px 10px;border-radius:8px}#status:empty{display:none}
+#pdf-open{display:inline-block;padding:9px 0}.office-list{padding-left:19px;overflow-wrap:anywhere}.office-list li{margin-bottom:8px}
+[hidden]{display:none!important}:focus-visible{outline:3px solid #2c8266;outline-offset:3px}
+</style></head>
+<body><main>
+<header><p class="muted">KKT Staging · 仅使用合成资料</p><h1>Site Supervisor</h1><a href="./ken-payslip-access-staging.html">我的工资单</a></header>
+<p id="status" role="status" aria-live="polite"></p>
+<section id="login-panel"><h2>登录测试环境</h2><form id="login">
+<label for="email">邮箱</label><input id="email" type="email" autocomplete="username" required>
+<label for="password">Staging 密码</label><input id="password" type="password" autocomplete="current-password" required>
+<button>登录</button></form></section>
+<div id="workspace" hidden>
+<div class="flex"><a href="#workcard" id="workcard-link">扫描工卡</a><a href="#petty" id="petty-link">Petty Cash</a><a href="#office" id="office-link" hidden>办公室复核</a><button id="logout" class="secondary" type="button">登出</button></div>
+<section id="workcard"><h2>扫描工卡</h2><form id="card-form">
+<div class="two"><div><label for="project">工程</label><select id="project" required></select></div>
+<div><label for="employee">工人</label><select id="employee" required></select></div></div>
+<label for="month">工卡月份</label><input id="month" type="month" required>
+<div class="two"><div><label for="front">1. 拍工卡正面</label><input id="front" type="file" accept="image/*" capture="environment" required></div>
+<div><label for="back">2. 拍工卡反面</label><input id="back" type="file" accept="image/*" capture="environment" required></div></div>
+<details open><summary>每日工时（人工读卡录入）</summary>
+<p class="muted">按当天输入小时与分钟，例如 8:30。空白表示未录入，0:00 表示当天没有工时。</p>
+<div id="days" class="hours"></div>
+<p><strong id="total-hours">合计 0:00</strong></p>
+</details>
+<div class="two"><div><label for="advance">预支 Advance（RM）</label><input id="advance" type="number" min="0" max="999999" step=".01" inputmode="decimal" placeholder="无记录可留空"></div>
+<div><label for="notes">补充资料</label><textarea id="notes" maxlength="120" rows="2"></textarea></div></div>
+<div class="flex"><button id="preview" type="button" class="secondary">生成 PDF 预览</button><button>提交办公室</button></div>
+<a id="pdf-open" hidden target="_blank" rel="noopener noreferrer">打开一页 PDF</a>
+</form></section>
+<section id="petty"><h2>Petty Cash</h2><form id="cash-form">
+<label for="cash-project">工程</label><select id="cash-project" required></select>
+<div class="two"><div><label for="date">支出日期</label><input id="date" type="date" required></div>
+<div><label for="amount">金额（RM）</label><input id="amount" type="number" min=".01" max="999999" step=".01" inputmode="decimal" required></div></div>
+<label for="expense">用途</label><input id="expense" maxlength="300" required>
+<label for="receipt">收据编号（如有）</label><input id="receipt" maxlength="120">
+<button>提交办公室复核</button></form></section>
+<section id="office" hidden><h2>办公室复核与 Excel</h2>
+<form id="office-form"><label for="review-month">核查月份</label><input id="review-month" type="month" required><button class="secondary">查看已提交项目</button></form>
+<p id="office-count" class="muted"></p><ul id="office-items" class="office-list"></ul>
+<button id="excel" type="button" disabled>导出 Excel 核查表</button>
+</section></div></main>
+<script>"use strict";
+const projectUrl = "https://qacmlpqtiwwmrypxnnlp.supabase.co";
+const key = "sb_publishable_ksPgK2lE7Uqo-goo8GP2XQ_u_HyjRM7";
+const org = "28900000-0000-0000-0000-000000000071";
+const get = id => document.getElementById(id);
+const bytes = text => new TextEncoder().encode(text);
+const say = text => { get("status").textContent = text; };
+const today = new Intl.DateTimeFormat("sv-SE",{timeZone:"Asia/Kuala_Lumpur",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+let session = "", busy = false, pdfUrl = "", cardId = null, cardIdentity = "", cashId = null, cashIdentity = "";
+let scope = {projects:[],workers:[],office:false};
+let queue = null;
+
+function setBusy(value) {
+  busy = value;
+  for (const button of document.querySelectorAll("button")) button.disabled = value;
+  get("excel").disabled = value || !queue;
+}
+async function api(path, body, method = "POST", mime = "application/json", extra = {}) {
+  const headers = {apikey:key,...extra};
+  if (session) headers.Authorization = "Bearer " + session;
+  if (body !== undefined) headers["Content-Type"] = mime;
+  const response = await fetch(projectUrl + "/" + path,{method,headers,
+    body:mime==="application/json"&&body!==undefined?JSON.stringify(body):body,
+    credentials:"omit",cache:"no-store",redirect:"error",signal:AbortSignal.timeout(35000)});
+  if (!response.ok) {
+    let info = {};
+    try { info = await response.json(); } catch {}
+    const error = new Error(String(response.status));
+    error.code = info.code;
+    throw error;
+  }
+  return response.status===204 ? null : response;
+}
+async function rpc(route, data) {
+  const response = await api("rest/v1/rpc/kkt_site_"+route,{target_org:org,...data});
+  return response && response.json();
+}
+function driveLink(drive,item) {
+  if (!/^[a-f0-9]{16}$/i.test(drive||"") || !/^[a-f0-9]{16}![a-z0-9_-]+$/i.test(item||"") ||
+      item.split("!",1)[0].toLowerCase()!==drive.toLowerCase()) return null;
+  const url=new URL("https://onedrive.live.com/");
+  url.searchParams.set("cid",drive);url.searchParams.set("id",item);
+  return url.href;
+}
+function presentError(error, fallback) {
+  if(error.message==="401") { clearSession();say("测试登录已失效，请重新登录。"); }
+  else if(error.message==="403") say("此账号没有该工程或办公室的权限。");
+  else if(error.code==="23505") say("该工人本月已存在提交记录，请办公室复核。");
+  else say(fallback);
+}
+function fill(select, rows, value, label, prompt) {
+  select.replaceChildren(new Option(prompt,""));
+  for (const row of rows) select.append(new Option(label(row),value(row)));
+  if (rows.length===1) select.selectedIndex=1;
+}
+function fillWorkers() {
+  fill(get("employee"),scope.workers.filter(w=>w.project_id===get("project").value),w=>w.ref,
+    w=>[w.name,w.ref].filter(Boolean).join(" · "),"请选择工人");
+}
+function hourText(minutes) {
+  return Math.floor(minutes/60)+":"+String(minutes%60).padStart(2,"0");
+}
+function updateTotal() {
+  const total=[...get("days").querySelectorAll("input")].reduce((sum,input)=>{
+    const m=input.value.trim().match(/^(\d{1,2}):([0-5]\d)$/);
+    return sum+(m?Number(m[1])*60+Number(m[2]):0);
+  },0);
+  get("total-hours").textContent = "合计 "+hourText(total);
+}
+function buildDays() {
+  const value=get("month").value;
+  const entries=new Map([...get("days").querySelectorAll("input")].map(i=>[i.name,i.value]));
+  get("days").replaceChildren();
+  if(!/^\d{4}-\d{2}$/.test(value))return;
+  const [year,month]=value.split("-").map(Number);
+  const dayCount=new Date(Date.UTC(year,month,0)).getUTCDate();
+  for(let day=1;day<=dayCount;day++){
+    const label=document.createElement("label");label.textContent=day+" 日";
+    const input=document.createElement("input");input.name=String(day).padStart(2,"0");
+    input.placeholder="8:30";input.maxLength=5;input.autocomplete="off";
+    input.value=entries.get(input.name)||"";label.append(input);get("days").append(label);
+  }
+  updateTotal();
+}
+function cardData() {
+  if(!get("card-form").reportValidity())throw Error("form");
+  const workers=scope.workers.filter(w=>w.project_id===get("project").value&&w.ref===get("employee").value);
+  if(workers.length!==1)throw Error("worker");
+  const daily={};
+  for(const input of get("days").querySelectorAll("input")){
+    if(!input.value.trim())continue;
+    const m=input.value.trim().match(/^(\d{1,2}):([0-5]\d)$/);
+    const minutes=m?Number(m[1])*60+Number(m[2]):-1;
+    if(minutes<0||minutes>1440){input.focus();throw Error("hours");}
+    daily[input.name]=minutes;
+  }
+  if(!Object.keys(daily).length)throw Error("hours");
+  return {worker:workers[0],month:get("month").value,daily,
+    advance:get("advance").value===""?null:Number(get("advance").value),notes:get("notes").value.trim(),
+    project:scope.projects.find(p=>p.id===get("project").value),front:get("front").files[0],back:get("back").files[0]};
+}
+async function thumbnail(file) {
+  if(!file?.type.startsWith("image/")||file.size>20000000)throw Error("image");
+  return createImageBitmap(file);
+}
+function paintFit(ctx,img,x,y,w,h) {
+  const scale=Math.min(w/img.width,h/img.height);
+  const dw=img.width*scale,dh=img.height*scale;
+  ctx.fillStyle="#f0f4f1";ctx.fillRect(x,y,w,h);
+  ctx.drawImage(img,x+(w-dw)/2,y+(h-dh)/2,dw,dh);
+}
+function writeCanvasText(ctx,text,maxWidth) {
+  const lines=[];let line="";
+  for(const char of String(text)){
+    if(ctx.measureText(line+char).width>maxWidth&&line){lines.push(line);line=char;}
+    else line+=char;
+  }
+  if(line)lines.push(line);
+  return lines;
+}
+function concat(chunks) {
+  const length=chunks.reduce((sum,chunk)=>sum+chunk.length,0);
+  const result=new Uint8Array(length);let offset=0;
+  for(const chunk of chunks){result.set(chunk,offset);offset+=chunk.length;}
+  return result;
+}
+function jpegPdf(jpeg,width,height) {
+  const objects=[
+    bytes("<< /Type /Catalog /Pages 2 0 R >>"),
+    bytes("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+    bytes("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /XObject << /Scan 4 0 R >> >> /Contents 5 0 R >>"),
+    concat([bytes("<< /Type /XObject /Subtype /Image /Width "+width+" /Height "+height+" /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length "+jpeg.length+" >>\nstream\n"),jpeg,bytes("\nendstream")]),
+  ];
+  const content=bytes("q\n595 0 0 842 0 0 cm\n/Scan Do\nQ\n");
+  objects.push(concat([bytes("<< /Length "+content.length+" >>\nstream\n"),content,bytes("endstream")]));
+  const chunks=[bytes("%PDF-1.4\n")],offsets=[0];
+  let offset=chunks[0].length;
+  for(let i=0;i<objects.length;i++){
+    offsets.push(offset);
+    const object=concat([bytes((i+1)+" 0 obj\n"),objects[i],bytes("\nendobj\n")]);
+    chunks.push(object);offset+=object.length;
+  }
+  chunks.push(bytes("xref\n0 6\n0000000000 65535 f \n"+offsets.slice(1).map(x=>String(x).padStart(10,"0")+" 00000 n \n").join("")+
+    "trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n"+offset+"\n%%EOF\n"));
+  return new Blob(chunks,{type:"application/pdf"});
+}
+async function makeCardPdf(data) {
+  const front=await thumbnail(data.front);
+  let back;
+  try {
+    back=await thumbnail(data.back);
+    const c=document.createElement("canvas");c.width=1240;c.height=1754;
+    const ctx=c.getContext("2d",{alpha:false});ctx.fillStyle="#fff";ctx.fillRect(0,0,c.width,c.height);
+    ctx.fillStyle="#164e3b";ctx.fillRect(0,0,c.width,155);
+    ctx.fillStyle="#fff";ctx.font="bold 44px sans-serif";ctx.fillText("KKT SETIA SDN. BHD.  |  月度工卡",56,70);
+    ctx.font="27px sans-serif";ctx.fillText("STAGING · 人工录入工时 · 待办公室复核",56,117);
+    ctx.fillStyle="#183a2e";ctx.font="bold 28px sans-serif";
+    ctx.fillText(data.worker.ref+" · "+(data.worker.name||""),56,208,1128);
+    ctx.font="24px sans-serif";ctx.fillText(data.month+" · "+data.project.name,56,245,1128);
+    ctx.fillText("工卡正面",56,294);ctx.fillText("工卡反面",634,294);
+    paintFit(ctx,front,56,312,550,800);paintFit(ctx,back,634,312,550,800);
+    ctx.fillStyle="#183a2e";ctx.font="bold 26px sans-serif";ctx.fillText("每日工时（小时:分钟）",56,1162);
+    ctx.font="22px sans-serif";
+    for(const [day,m] of Object.entries(data.daily)){
+      const pos=Number(day)-1;
+      ctx.fillText(day+" 日  "+hourText(m),56+(pos%5)*229,1210+Math.floor(pos/5)*39);
+    }
+    const total=Object.values(data.daily).reduce((a,b)=>a+b,0);
+    ctx.font="bold 26px sans-serif";ctx.fillText("总工时 "+hourText(total)+"     Advance "+(data.advance==null?"未录入":"RM "+data.advance.toFixed(2)),56,1500,1128);
+    ctx.font="22px sans-serif";
+    writeCanvasText(ctx,"备注："+(data.notes||"无"),1128).slice(0,4).forEach((line,i)=>ctx.fillText(line,56,1550+i*32));
+    ctx.fillText("工卡照片及录入值供公司复核。",56,1703);
+    const raster=await new Promise(resolve=>c.toBlob(resolve,"image/jpeg",.84));
+    if(!raster)throw Error("image");
+    return jpegPdf(new Uint8Array(await raster.arrayBuffer()),c.width,c.height);
+  } finally {front.close();back?.close();}
+}
+function resetPreview(){
+  if(pdfUrl)URL.revokeObjectURL(pdfUrl);
+  pdfUrl="";get("pdf-open").hidden=true;get("pdf-open").removeAttribute("href");
+}
+function showPreview(pdf){
+  resetPreview();pdfUrl=URL.createObjectURL(pdf);
+  get("pdf-open").href=pdfUrl;get("pdf-open").hidden=false;
+}
+function clearSession() {
+  session="";scope={projects:[],workers:[],office:false};queue=null;
+  resetPreview();get("workspace").hidden=true;get("login-panel").hidden=false;
+  get("card-form").reset();get("cash-form").reset();get("office-items").replaceChildren();get("office-count").textContent="";
+  get("month").value=today.slice(0,7);get("review-month").value=today.slice(0,7);get("date").value=today;
+  buildDays();cardId=null;cardIdentity="";cashId=null;cashIdentity="";
+}
+async function openTemporaryPdf(path, checksum, title){
+  const resp=await api("storage/v1/object/authenticated/kkt-site-intake-staging/"+path,undefined,"GET");
+  const pdf=await resp.blob();
+  const digest=[...new Uint8Array(await crypto.subtle.digest("SHA-256",await pdf.arrayBuffer()))].map(x=>x.toString(16).padStart(2,"0")).join("");
+  if(digest!==checksum)throw Error("PDF checksum mismatch");
+  downloadBlob(pdf,title);
+}
+function downloadBlob(blob, name) {
+  const url=URL.createObjectURL(blob), link=document.createElement("a");
+  link.href=url;link.download=name;link.click();
+  setTimeout(()=>URL.revokeObjectURL(url),30000);
+}
+get("project").addEventListener("change",fillWorkers);
+get("month").addEventListener("change",()=>{get("days").replaceChildren();buildDays();});
+get("days").addEventListener("input",updateTotal);
+clearSession();
+
+get("login").addEventListener("submit",async e=>{
+  e.preventDefault();if(busy)return;
+  setBusy(true);
+  const password=get("password").value;get("password").value="";
+  try{
+    const r=await api("auth/v1/token?grant_type=password",{email:get("email").value.trim(),password});
+    session=(await r.json()).access_token;
+    scope=await rpc("scope",{});
+    if(!scope?.projects?.length&&!scope?.office){clearSession();say("此账号尚未绑定工程或办公室权限。");return;}
+    for(const id of ["workcard","petty","workcard-link","petty-link"])get(id).hidden=!scope.projects.length;
+    for(const id of ["office","office-link"])get(id).hidden=!scope.office;
+    fill(get("project"),scope.projects,x=>x.id,x=>x.name,"请选择工程");
+    fill(get("cash-project"),scope.projects,x=>x.id,x=>x.name,"请选择工程");
+    fillWorkers();get("login-panel").hidden=true;get("workspace").hidden=false;say("");
+  }catch(error){clearSession();presentError(error,"登录失败，请核对 Staging 账号密码。");}
+  finally{setBusy(false);}
+});
+get("logout").addEventListener("click",async()=>{
+  if(busy)return;setBusy(true);
+  try{await api("auth/v1/logout?scope=local",{});}catch{}
+  finally{clearSession();say("已登出。");setBusy(false);}
+});
+async function processCard(submit){
+  if(busy)return;setBusy(true);
+  try{
+    const data=cardData();
+    const pdf=await makeCardPdf(data);
+    if(pdf.size>3145728)throw Error("size");
+    showPreview(pdf);
+    if(!submit){say("一页 PDF 已生成，可先核对。");return;}
+    const identity=data.project.id+"/"+data.worker.ref+"/"+data.month;
+    if(identity!==cardIdentity){cardId=crypto.randomUUID();cardIdentity=identity;}
+    const path=await rpc("prepare_card",{card_id:cardId,selected_project:data.project.id,worker_ref:data.worker.ref,
+      work_month:data.month+"-01",minutes_by_day:data.daily,advance:data.advance,remarks:data.notes});
+    const digest=[...new Uint8Array(await crypto.subtle.digest("SHA-256",await pdf.arrayBuffer()))].map(x=>x.toString(16).padStart(2,"0")).join("");
+    await api("storage/v1/object/kkt-site-intake-staging/"+path,pdf,"POST","application/pdf",{"x-upsert":"true"});
+    await rpc("submit_card",{card_id:cardId,checksum:digest});
+    get("front").value="";get("back").value="";
+    say("工卡已交办公室复核，OneDrive 归档状态待处理。");
+  }catch(error){
+    if(error.message==="hours")say("请输入至少一天有效工时，例如 8:30。");
+    else if(error.message!=="form")presentError(error,"工卡未提交。请检查照片与网络，再试一次。");
+  }finally{setBusy(false);}
+}
+get("preview").addEventListener("click",()=>processCard(false));
+get("card-form").addEventListener("submit",event=>{event.preventDefault();processCard(true);});
+get("cash-form").addEventListener("submit",async e=>{
+  e.preventDefault();if(busy)return;setBusy(true);
+  const data={selected_project:get("cash-project").value,claim_date:get("date").value,amount:Number(get("amount").value),
+    details:get("expense").value.trim(),receipt:get("receipt").value.trim()};
+  const identity=JSON.stringify(data);
+  if(cashIdentity!==identity){cashIdentity=identity;cashId=crypto.randomUUID();}
+  try{await rpc("submit_petty_cash",{claim_id:cashId,...data});
+    get("amount").value="";get("expense").value="";get("receipt").value="";cashId=null;cashIdentity="";
+    say("Petty Cash 已交办公室复核。");
+  }catch(error){presentError(error,"Petty Cash 未提交，请检查资料后重试。");}
+  finally{setBusy(false);}
+});
+get("office-form").addEventListener("submit",async e=>{
+  e.preventDefault();if(busy)return;setBusy(true);queue=null;get("office-items").replaceChildren();
+  try{
+    queue=await rpc("office_queue",{work_month:get("review-month").value+"-01"});
+    if(!queue)throw Error("403");
+    queue.period=get("review-month").value+"-01";
+    const submitted=new Set(queue.cards.map(row=>row.employee_ref));
+    const missing=(queue.expected_workers||[]).filter(worker=>!submitted.has(worker.employee_ref));
+    get("office-count").textContent="工卡 "+queue.cards.length+" 份 · 现有工地名单待核对 "+missing.length+" 人 · Petty Cash "+queue.petty_cash.length+" 笔";
+    for(const row of queue.cards){
+      const li=document.createElement("li");
+      li.textContent=[row.name,row.employee_ref,row.project,hourText(row.total_minutes),row.status==="archived"?"已归档":"待归档"].filter(Boolean).join(" · ");
+      const archive=driveLink(row.onedrive_drive_id,row.onedrive_item_id);
+      if(archive){const a=document.createElement("a");a.href=archive;a.target="_blank";a.rel="noopener noreferrer";a.textContent="OneDrive PDF";li.append(" ",a);}
+      else{
+        const b=document.createElement("button");b.type="button";b.className="secondary";b.textContent="下载待归档 PDF";
+        b.addEventListener("click",async()=>{if(busy)return;setBusy(true);try{await openTemporaryPdf(row.object_path,row.sha256,"workcard-"+row.id+".pdf");}catch(error){presentError(error,"文件下载或校验失败。");}finally{setBusy(false);}});
+        li.append(" ",b);
+      }
+      get("office-items").append(li);
+    }
+    for(const row of queue.petty_cash){
+      const li=document.createElement("li");li.textContent=row.spent_on+" · "+row.project+" · RM "+Number(row.amount_rm).toFixed(2)+" · "+row.description;
+      get("office-items").append(li);
+    }
+  }catch(error){presentError(error,"无法读取复核月份。");}
+  finally{setBusy(false);}
+});
+
+function xml(value) {
+  return String(value).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g," ").replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function worksheet(rows) {
+  const content=rows.map(r=>"<row>"+r.map(x=>{
+    if(x==null)return "<c/>";
+    if(typeof x==="number")return "<c><v>"+x+"</v></c>";
+    return '<c t="inlineStr"><is><t xml:space="preserve">'+xml(x)+"</t></is></c>";
+  }).join("")+"</row>").join("");
+  return '<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'+content+"</sheetData></worksheet>";
+}
+function crc32(data) {
+  let crc=0xffffffff;
+  for(const value of data){
+    crc^=value;
+    for(let b=0;b<8;b++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);
+  }
+  return (crc^0xffffffff)>>>0;
+}
+function binary(length,fields) {
+  const data=new Uint8Array(length);const view=new DataView(data.buffer);
+  for(const [offset,width,value] of fields){
+    if(width===4)view.setUint32(offset,value,true);
+    else view.setUint16(offset,value,true);
+  }
+  return data;
+}
+function zip(files) {
+  const chunks=[],center=[];let offset=0;
+  for(const [name,content] of files){
+    const keyBytes=bytes(name), data=bytes(content), check=crc32(data);
+    const local=binary(30,[[0,4,0x04034b50],[4,2,20],[14,4,check],[18,4,data.length],[22,4,data.length],[26,2,keyBytes.length]]);
+    chunks.push(local,keyBytes,data);
+    center.push(binary(46,[[0,4,0x02014b50],[4,2,20],[6,2,20],[16,4,check],[20,4,data.length],
+      [24,4,data.length],[28,2,keyBytes.length],[42,4,offset]]),keyBytes);
+    offset+=local.length+keyBytes.length+data.length;
+  }
+  const centerSize=center.reduce((sum,part)=>sum+part.length,0);
+  const end=binary(22,[[0,4,0x06054b50],[8,2,files.length],[10,2,files.length],[12,4,centerSize],[16,4,offset]]);
+  return new Blob([...chunks,...center,end],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+}
+function reviewWorkbook(batch) {
+  const summary=[["Employee Code","Name","Project","Month","Total Minutes","Total Hours","Advance RM",
+    "Basic Salary RM","Overtime RM","Employee EPF RM","Employer EPF RM","Employee SOCSO RM","Employer SOCSO RM",
+    "Employee EIS RM","Employer EIS RM","PCB RM","Other Deductions RM","Net Pay RM","Archive Status","Office Review","Notes","OneDrive"]];
+  const daily=[["Employee Code","Name","Project","Month","Day","Work Minutes","Work Hours"]];
+  for(const r of batch.cards){
+    summary.push([r.employee_ref,r.name,r.project,r.month,Number(r.total_minutes),Number((r.total_minutes/60).toFixed(4)),r.advance_rm==null?null:Number(r.advance_rm),
+      ...Array(11).fill(null),r.status==="archived"?"Archived":"Pending archive","Pending verification",r.notes,driveLink(r.onedrive_drive_id,r.onedrive_item_id)]);
+    for(const [day,minutes] of Object.entries(r.daily_minutes).sort()){
+      daily.push([r.employee_ref,r.name,r.project,r.month,Number(day),Number(minutes),Number((minutes/60).toFixed(4))]);
+    }
+  }
+  const submitted=new Set(batch.cards.map(row=>row.employee_ref));
+  const month=batch.period||batch.cards[0]?.month||null;
+  for(const worker of batch.expected_workers||[]){
+    if(!submitted.has(worker.employee_ref))summary.push([worker.employee_ref,worker.name,worker.project,month,null,null,null,
+      ...Array(11).fill(null),"No submission","Check expected workers for this month",null,null]);
+  }
+  const petty=[["Date","Project","Amount RM","Purpose","Receipt Reference","Office Review"]];
+  for(const r of batch.petty_cash)petty.push([r.spent_on,r.project,Number(r.amount_rm),r.description,r.receipt_reference,"Pending verification"]);
+  const sheets=[["Payroll Review",summary],["Daily Work Hours",daily],["Petty Cash",petty]];
+  const documentRel="http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
+  const root="http://schemas.openxmlformats.org/package/2006/";
+  const files=[
+    ["[Content_Types].xml",'<Types xmlns="'+root+'content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'+sheets.map((_,i)=>'<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join("")+"</Types>"],
+    ["_rels/.rels",'<Relationships xmlns="'+root+'relationships"><Relationship Id="rId1" Type="'+documentRel+'officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+    ["xl/workbook.xml",'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="'+documentRel.slice(0,-1)+'"><sheets>'+sheets.map(([name],i)=>'<sheet name="'+xml(name)+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>').join("")+"</sheets></workbook>"],
+    ["xl/_rels/workbook.xml.rels",'<Relationships xmlns="'+root+'relationships">'+sheets.map((_,i)=>'<Relationship Id="rId'+(i+1)+'" Type="'+documentRel+'worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>').join("")+"</Relationships>"],
+  ];
+  sheets.forEach(([,rows],i)=>files.push(["xl/worksheets/sheet"+(i+1)+".xml",worksheet(rows)]));
+  return zip(files);
+}
+get("excel").addEventListener("click",()=>{
+  if(!queue||busy)return;
+  downloadBlob(reviewWorkbook(queue),"KKT-site-review-"+get("review-month").value+".xlsx");
+});
+</script>
+</body></html>
