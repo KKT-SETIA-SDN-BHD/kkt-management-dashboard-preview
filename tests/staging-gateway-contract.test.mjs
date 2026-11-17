@@ -19,6 +19,8 @@ test('staging gateway limits origin, methods, resources and paths', () => {
   assert.match(source,/https:\/\/kkt-setia-sdn-bhd\.github\.io/);
   assert.match(source,/origin !== allowedOrigin/);
   assert.match(source,/request\.method !== "GET"/);
-  assert.ok(source.includes('url.pathname !== "/functions/v1/kkt-dashboard-readonly/" + resource'));
+  assert.ok(source.includes('const route = `/kkt-dashboard-readonly/${resource}`'));
+  assert.ok(source.includes('![route, `/functions/v1${route}`, `/${resource}`].includes(url.pathname)'));
+  assert.match(source,/!resources\.has\(resource\)/);
   assert.match(source,/Cache-Control": "no-store"/);
 });
