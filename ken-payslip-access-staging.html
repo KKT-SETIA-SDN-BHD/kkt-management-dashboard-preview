@@ -2,7 +2,7 @@
 <html lang="zh-Hans"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; img-src data:; style-src 'unsafe-inline'; script-src 'sha256-tYnKPhISiMO0qSKIVmVPZfStURjYxh/1pK29gwSZIVc='; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; img-src data:; style-src 'unsafe-inline'; script-src 'sha256-DdskD1lI8a5lyd+jeD9DShb5pHWFsylT4Jo8fJbTM/Q='; base-uri 'none'; form-action 'none'">
 <title>KKT 工资单查阅与列印</title>
 <style>
 :root{font-family:system-ui,sans-serif;color:#15273c;background:#f0f3f8}*{box-sizing:border-box}
@@ -18,17 +18,31 @@ button.secondary{background:#e5edf8;color:#243e62}button:disabled{opacity:.6;cur
 .slip-head h2{font-size:1.25rem;margin:0}.slip-head p{margin:4px 0}.payslip table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 .payslip th,.payslip td{border-bottom:1px solid #dae3ef;padding:6px 3px;text-align:right;font-size:.9rem}.payslip th:first-child{text-align:left}
 .slip-net{display:flex;justify-content:space-between;background:#e9eef7;padding:10px;font-weight:700}.signatures{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:38px 0 8px}.signatures span{border-top:1px solid #253f68;padding-top:8px}
+#portal-nav{margin:12px 0 18px}#portal-nav a{border:1px solid #bccbe0;padding:9px 13px;border-radius:8px;text-decoration:none}
+#portal-nav [aria-current="page"]{background:#253f68;border-color:#253f68;color:#fff}
+.section-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.section-head h2{margin:0;font-size:1.2rem}
+#roster-search{width:min(100%,430px);margin-bottom:6px}.roster-list{list-style:none;margin:12px 0 0;padding:0}
+.roster-list li{border-top:1px solid #dbe4f0;padding:14px 0;display:grid;grid-template-columns:minmax(155px,1fr) minmax(170px,1.2fr) minmax(110px,.85fr);gap:8px 16px;overflow-wrap:anywhere}
+.roster-list strong,.roster-list small,.roster-list span{display:block}.roster-list strong{margin-bottom:3px}.roster-list small{color:#52617a}
+#pdf-panel:focus{outline:none}#pdf-tools h2{margin:0}.record button{min-width:74px;font-weight:700}
+@media(max-width:620px){.roster-list li{grid-template-columns:1fr 1fr}.roster-list li>div:nth-child(3){grid-column:span 2}.record{align-items:center}.section-head{align-items:flex-start}}
+@media(max-width:380px){.roster-list li{grid-template-columns:1fr}.roster-list li>div:nth-child(3){grid-column:auto}}
 @page{size:A4;margin:14mm}
-@media print{:root{background:white}main{margin:0;padding:0;max-width:none}main>*:not(#print-output){display:none!important}.payslip{margin:0;padding:0;border:0;break-after:page}.payslip:last-child{break-after:auto}.payslip table,.signatures{break-inside:avoid}}
+@media print{:root{background:white}main{margin:0;padding:0;max-width:none}main>*:not(#pdf-panel),#pdf-tools{display:none!important}.payslip{margin:0;padding:0;border:0;break-after:page}.payslip:last-child{break-after:auto}.payslip table,.signatures{break-inside:avoid}}
 </style></head>
 <body><main>
-<header><p class="muted">KKT Staging · 合成工资单</p><h1>工资单</h1><p>员工可查阅自己的已复核工资单。薪资 Admin 可选择多份列印。</p></header>
+<header><p class="muted">KKT Staging · 合成工资单</p><h1 id="portal-title">工资单</h1></header>
 <section id="login-panel"><form id="login">
 <label for="email">Staging 登录邮箱</label><input id="email" type="email" autocomplete="username" required>
 <label for="password">测试项目密码</label><input id="password" type="password" autocomplete="current-password" required>
 <div class="flex"><button id="sign-in" type="submit">登录</button></div>
 </form></section>
 <p id="status" role="status" aria-live="polite"></p>
+<nav id="portal-nav" aria-label="员工管理" class="flex" hidden>
+<a id="nav-payroll" href="./ken-payslip-access-staging.html">工资单</a>
+<a id="nav-roster" href="./ken-payslip-access-staging.html?view=foreign-workers">外劳总览</a>
+</nav>
 <section id="workspace" hidden>
 <div class="flex"><strong id="viewer"></strong><button id="logout" type="button" class="secondary">登出</button></div>
 <div class="profile-panel">
@@ -43,12 +57,25 @@ button.secondary{background:#e5edf8;color:#243e62}button:disabled{opacity:.6;cur
 </div>
 <h2>每月工资单</h2>
 <form id="lookup" class="flex"><label for="month">工资月份</label><input id="month" type="month" required><button type="submit" class="secondary">查看月份</button></form>
-<div id="batch" class="flex" hidden><label><input id="select-all" type="checkbox">全选本月</label><button id="print-selected" type="button">列印所选</button></div>
-<p id="print-help" class="muted">列印时也可选择另存为 PDF。受保护的链接只会向有权限的账号显示工资单。</p>
+<div id="batch" class="flex" hidden><label><input id="select-all" type="checkbox">全选本月</label><button id="print-selected" type="button">批量 PDF</button></div>
+<p id="print-help" class="muted">打开 PDF 后可分享链接、列印或另存为 PDF。</p>
 <div id="records"></div>
-<label id="share-label" for="share-url" hidden>分享链接</label><input id="share-url" readonly hidden>
+</section>
+<section id="roster-workspace" hidden aria-labelledby="roster-heading">
+<div class="section-head"><h2 id="roster-heading">外劳名单与工程位置</h2><button id="roster-logout" class="secondary" type="button">登出</button></div>
+<label for="roster-search">按姓名、员工代号、工程或地点查找</label>
+<input id="roster-search" type="search" autocomplete="off">
+<p id="roster-count" class="muted" role="status"></p>
+<ul id="roster-list" class="roster-list"></ul>
+</section>
+<div id="pdf-panel" hidden tabindex="-1" aria-labelledby="pdf-title">
+<section id="pdf-tools">
+<div class="section-head"><h2 id="pdf-title">工资单 PDF</h2><button id="pdf-close" class="secondary" type="button">返回名单</button></div>
+<div class="flex"><button id="pdf-print" type="button">列印 / 另存 PDF</button><button id="pdf-share" class="secondary" type="button">分享链接</button></div>
+<label id="share-label" for="share-url" hidden>复制此链接</label><input id="share-url" readonly hidden>
 </section>
 <div id="print-output"></div>
+</div>
 <p><a href="./ken-payroll-staging.html">返回 Staging 薪资预览</a></p>
 </main>
 <template id="slip">
@@ -66,8 +93,8 @@ const get = id => document.getElementById(id);
 const project = "https://qacmlpqtiwwmrypxnnlp.supabase.co";
 const key = "sb_publishable_ksPgK2lE7Uqo-goo8GP2XQ_u_HyjRM7";
 const org = "28900000-0000-0000-0000-000000000071";
-const params = new URLSearchParams(location.search);
-const sharedId = params.get("payslip");
+let sharedId = null;
+let rosterView = false;
 const money = new Intl.NumberFormat("en-MY", {minimumFractionDigits: 2, maximumFractionDigits: 2});
 let session = "";
 let role = "";
@@ -75,15 +102,28 @@ let records = [];
 let busy = false;
 let sharedView = false;
 let profiles = [];
+let rosterRows = [];
+let pdfRows = [];
+let pdfReturnFocus = null;
 let pdfUrl = "";
 const groupNames = {local_site: "本地工地员工", foreign_site: "外籍工地员工", office: "Office 员工", unconfirmed: "待确认"};
 const selections = new Set();
 const printOut = get("print-output");
 const say = message => { get("status").textContent = message; };
+function syncRoute() {
+  const route = new URLSearchParams(location.search);
+  sharedId = route.get("payslip");
+  rosterView = route.get("view") === "foreign-workers";
+  get("portal-title").textContent = rosterView ? "外劳总览" : "工资单";
+  get("nav-payroll").removeAttribute("aria-current");
+  get("nav-roster").removeAttribute("aria-current");
+  get(rosterView ? "nav-roster" : "nav-payroll").setAttribute("aria-current", "page");
+}
+syncRoute();
 
 function setBusy(value) {
   busy = value;
-  const controls = document.querySelectorAll("#login button, #logout, #lookup button, #profile-select");
+  const controls = document.querySelectorAll("#login button, #logout, #roster-logout, #lookup button, #profile-select");
   for (const control of controls) control.disabled = value;
   get("print-selected").disabled = value || selections.size === 0;
 }
@@ -110,7 +150,7 @@ function clearRecords() {
   records = [];
   selections.clear();
   get("records").replaceChildren();
-  printOut.replaceChildren();
+  closePdfPreview();
   get("select-all").checked = false;
   get("select-all").indeterminate = false;
   get("batch").hidden = true;
@@ -128,6 +168,12 @@ function clearSession() {
   clearPdf();
   get("pdf-status").textContent = "";
   get("workspace").hidden = true;
+  get("roster-workspace").hidden = true;
+  get("portal-nav").hidden = true;
+  rosterRows = [];
+  get("roster-list").replaceChildren();
+  get("roster-search").value = "";
+  get("roster-count").textContent = "";
   get("login-panel").hidden = false;
 }
 function handleFailure(error, fallback) {
@@ -167,8 +213,7 @@ function renderRecords() {
     label.append(row.employee_ref + " · " + row.salary_month.slice(0, 7));
     const controls = document.createElement("div");
     controls.className = "flex";
-    controls.append(makeButton("查看", () => showSlips([row])), makeButton("分享链接", () => share(row)),
-      makeButton("列印", () => printSlips([row])));
+    controls.append(makeButton("PDF", () => showSlips([row])));
     item.append(label, controls);
     get("records").append(item);
   }
@@ -315,6 +360,51 @@ async function showMonth(selectedId = null) {
     if (selectedId) showSlips(records);
   }
 }
+function rosterField(item, label, value, secondary) {
+  const block = document.createElement("div");
+  const key = document.createElement("small");
+  const primary = document.createElement("strong");
+  key.textContent = label;
+  primary.textContent = value;
+  block.append(key, primary);
+  if (secondary) {
+    const note = document.createElement("span");
+    note.textContent = secondary;
+    block.append(note);
+  }
+  item.append(block);
+}
+function renderRoster() {
+  const term = get("roster-search").value.trim().toLowerCase();
+  const visible = rosterRows.filter(row =>
+    [row.employee_ref,row.preferred_name,row.project_code,row.project_title,row.site_location]
+      .some(value => String(value || "").toLowerCase().includes(term)));
+  get("roster-count").textContent = "显示 " + visible.length + " 人，共 " + rosterRows.length + " 人";
+  const list = get("roster-list");
+  list.replaceChildren();
+  for (const row of visible) {
+    const item = document.createElement("li");
+    const active = row.employment_state === "active";
+    rosterField(item, "员工", row.preferred_name || "未填写姓名", row.employee_ref);
+    rosterField(item, "当前工程", row.project_title || (row.employment_state === "inactive" ? "暂无当前工程" : "待确认"), row.project_code);
+    rosterField(item, "工程位置", row.site_location || (row.employment_state === "inactive" ? "—" : "待确认"),
+      row.confirmed_on ? "确认日期 " + row.confirmed_on : (active ? "在职" : row.employment_state === "inactive" ? "离职" : "在职状态待确认"));
+    list.append(item);
+  }
+}
+async function loadRoster() {
+  const rows = [];
+  const size = 150;
+  for (let offset = 0;; offset += size) {
+    const page = await rpc("kkt_foreign_worker_roster", {}, "?limit=" + size + "&offset=" + offset);
+    if (!Array.isArray(page)) throw Error("Unexpected roster response");
+    rows.push(...page);
+    if (page.length < size) break;
+  }
+  rosterRows = rows;
+  renderRoster();
+}
+get("roster-search").addEventListener("input", renderRoster);
 function tableRow(table, label, amounts) {
   const row = table.insertRow();
   const heading = document.createElement("th");
@@ -323,8 +413,22 @@ function tableRow(table, label, amounts) {
   row.append(heading);
   for (const value of amounts) row.insertCell().textContent = value == null ? "不适用" : money.format(value);
 }
-function showSlips(rows) {
+function closePdfPreview(restoreFocus = false) {
+  pdfRows = [];
   printOut.replaceChildren();
+  get("pdf-panel").hidden = true;
+  clearShare();
+  if (restoreFocus && pdfReturnFocus?.isConnected) pdfReturnFocus.focus();
+  pdfReturnFocus = null;
+}
+function showSlips(rows) {
+  if (!rows.length) return;
+  pdfReturnFocus = document.activeElement;
+  pdfRows = rows;
+  clearShare();
+  printOut.replaceChildren();
+  get("pdf-title").textContent = rows.length === 1 ? "工资单 PDF" : "工资单 PDF · " + rows.length + " 份";
+  get("pdf-share").hidden = rows.length !== 1;
   for (const row of rows) {
     const sheet = get("slip").content.cloneNode(true);
     sheet.querySelector(".slip-meta").textContent = "Employee No. " + row.employee_ref + " · " + row.salary_month.slice(0, 7);
@@ -343,12 +447,12 @@ function showSlips(rows) {
     sheet.querySelector(".slip-net span:last-child").textContent = "RM " + money.format(row.net_salary);
     printOut.append(sheet);
   }
+  get("pdf-panel").hidden = false;
+  get("pdf-panel").focus();
 }
-function printSlips(rows) {
-  if (!rows.length) return;
-  showSlips(rows);
-  window.print();
-}
+get("pdf-close").addEventListener("click", () => closePdfPreview(true));
+get("pdf-print").addEventListener("click", () => { if (pdfRows.length) window.print(); });
+get("pdf-share").addEventListener("click", () => { if (pdfRows.length === 1) share(pdfRows[0]); });
 async function share(row) {
   const url = new URL(location.pathname, location.origin);
   url.searchParams.set("payslip", row.payslip_id);
@@ -398,13 +502,46 @@ get("login").addEventListener("submit", async event => {
     }
     get("viewer").textContent = role === "payroll_admin" ? "薪资 Admin" : "员工";
     get("login-panel").hidden = true;
-    get("workspace").hidden = false;
-    await showMonth(sharedId);
-    await loadProfiles();
+    get("portal-nav").hidden = role !== "payroll_admin";
+    await displayCurrentView();
   } catch (error) {
     handleFailure(error, "暂时无法载入工资单，请重试。");
   } finally { setBusy(false); }
 });
+async function displayCurrentView() {
+  if (!session) return;
+  syncRoute();
+  clearRecords();
+  clearPdf();
+  const canSeeRoster = rosterView && role === "payroll_admin";
+  get("workspace").hidden = canSeeRoster;
+  get("roster-workspace").hidden = !canSeeRoster;
+  if (canSeeRoster) {
+    say("");
+    await loadRoster();
+  } else {
+    await showMonth(rosterView ? null : sharedId);
+    await loadProfiles();
+    if (rosterView) say("外劳总览仅限获授权的薪资 Admin。");
+  }
+}
+async function changeView() {
+  if (!session) { syncRoute(); return; }
+  setBusy(true);
+  try { await displayCurrentView(); }
+  catch (error) { handleFailure(error, "无法打开页面，请稍后重试。"); }
+  finally { setBusy(false); }
+}
+for (const link of get("portal-nav").querySelectorAll("a")) {
+  link.addEventListener("click", event => {
+    if (!session || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    if (busy) return;
+    history.pushState(null, "", link.href);
+    changeView();
+  });
+}
+window.addEventListener("popstate", changeView);
 get("lookup").addEventListener("submit", async event => {
   event.preventDefault();
   if (busy || !session) return;
@@ -413,12 +550,14 @@ get("lookup").addEventListener("submit", async event => {
   catch (error) { handleFailure(error, "暂时无法读取此月份，请重试。"); }
   finally { setBusy(false); }
 });
-get("logout").addEventListener("click", async () => {
+async function logOut() {
   setBusy(true);
   try { await api("auth/v1/logout?scope=local", {}); }
   catch { /* Clear all local data even if the network is unavailable. */ }
   finally { clearSession(); say("已登出。"); setBusy(false); }
-});
+}
+get("logout").addEventListener("click", logOut);
+get("roster-logout").addEventListener("click", logOut);
 get("select-all").addEventListener("change", event => {
   if (busy || role !== "payroll_admin") return;
   selections.clear();
@@ -426,7 +565,7 @@ get("select-all").addEventListener("change", event => {
   renderRecords();
 });
 get("print-selected").addEventListener("click", () => {
-  if (!busy && role === "payroll_admin") printSlips(records.filter(row => selections.has(row.payslip_id)));
+  if (!busy && role === "payroll_admin") showSlips(records.filter(row => selections.has(row.payslip_id)));
 });
 </script>
 </body></html>
