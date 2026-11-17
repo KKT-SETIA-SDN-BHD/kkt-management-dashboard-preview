@@ -2,6 +2,21 @@
 
 Status: RELEASE CANDIDATE ONLY — NO PRODUCTION DEPLOYMENT
 
+## Production preflight — 2026-11-18 (MYT)
+
+Decision: **G2 STOP / NO-GO**. Read-only Production inventory returned no Edge Functions. Of the five Dashboard schemas checked, only `ken_property` was present. Schema presence alone does not establish readiness. No Production data or settings were changed.
+
+| Gate | Evidence and remaining work |
+| --- | --- |
+| Android Staging sign-in and PIN | PASS for the synthetic page. Session-local PIN and Android Chrome outcomes are recorded in [Staging acceptance](pin-unlock-staging-acceptance.md). |
+| Populated database authorization | PASS in Staging SQL under `authenticated` role and synthetic JWT subjects. The [rollback-only test](https://github.com/KKT-SETIA-SDN-BHD/kkt-management-dashboard-preview/blob/ac5def70218be22701953e2758e5be960bb96d63/tests/staging-dashboard-populated-isolation.sql) passed 24 exact row-set assertions. Two synthetic users covered own-scope reads, same-organization cross-project denial, cross-organization denial, private-owner isolation, parent-document version scope, finance-role revocation and disabled membership. Zero test users and organizations remained after rollback. |
+| Anonymous database grants | Staging catalog showed RLS on all 12 tables checked across the five Dashboard schemas. The `anon` role had no SELECT grants on those tables and no EXECUTE grant on `public.kkt_ken_property_summary()`. |
+| HTTP authorization with populated data | OPEN. The v5 gateway denial path passed its prior HTTP matrix. The gateway deliberate deny response still needs to be replaced by a caller-scoped Staging read path with verified provenance and direct HTTP tests using two actual Auth-signed test identities. SQL role tests do not exercise PostgREST or Edge Function routing. |
+| Documents and finance | OPEN. Verify authorized and denied OneDrive file access and link expiry with synthetic files, and reconcile claims and amounts against the approved source of record. |
+| Production release and rollback | OPEN. Prepare reviewed schema/gateway deployment for the approved scopes, establish rollback and monitoring, then run the gated release. |
+
+Staging Security Advisor still reports [leaked-password protection disabled](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection). It also flags three WhatsApp/PO definer RPCs outside this Dashboard release. The Dashboard's RLS-without-policy observations for the roles and project-assignment tables coincide with denied SELECT grants for `authenticated` and `anon`.
+
 ## Existing preview
 - GitHub Pages public repository currently serves synthetic fixtures and fictional role selection.
 - Demo sign-in is not authentication; it must never authorize real financial, employee, supplier or property data.
