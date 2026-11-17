@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; img-src blob:; style-src 'unsafe-inline'; script-src 'sha256-Kg1bKyhJFsFCHB5RHZzGOVIATic+Vc5A6++5Wps3tnc='; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; img-src blob:; style-src 'unsafe-inline'; script-src 'sha256-f+EVMyUE95ULm0Q7jE4j6TanWDZBCGDZVp2iIxJzB0U='; base-uri 'none'; form-action 'none'">
 <title>KKT Site Supervisor</title>
 <style>
 *{box-sizing:border-box}html{color-scheme:light}body{margin:0;background:#eef4f1;color:#152d24;font:16px/1.5 system-ui,sans-serif}
@@ -408,7 +408,9 @@ function worksheet(rows) {
     if(typeof x==="number")return "<c><v>"+x+"</v></c>";
     return '<c t="inlineStr"><is><t xml:space="preserve">'+xml(x)+"</t></is></c>";
   }).join("")+"</row>").join("");
-  return '<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'+content+"</sheetData></worksheet>";
+  return '<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
+    '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><sheetData>'+content+
+    '</sheetData><pageMargins left="0.25" right="0.25" top="0.3" bottom="0.3" header="0.15" footer="0.15"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="1"/></worksheet>';
 }
 function crc32(data) {
   let crc=0xffffffff;
