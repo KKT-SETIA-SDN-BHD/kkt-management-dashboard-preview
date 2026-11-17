@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; img-src blob:; style-src 'unsafe-inline'; script-src 'sha256-f+EVMyUE95ULm0Q7jE4j6TanWDZBCGDZVp2iIxJzB0U='; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; img-src blob:; style-src 'unsafe-inline'; script-src 'sha256-wQY5mF+rHJUdBI2x3K7YVDs0VHhOpwI+fyeuXbKXJ60='; base-uri 'none'; form-action 'none'">
 <title>KKT Site Supervisor</title>
 <style>
 *{box-sizing:border-box}html{color-scheme:light}body{margin:0;background:#eef4f1;color:#152d24;font:16px/1.5 system-ui,sans-serif}
@@ -233,7 +233,7 @@ function jpegPdf(jpeg,width,height) {
     "trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n"+offset+"\n%%EOF\n"));
   return new Blob(chunks,{type:"application/pdf"});
 }
-async function makeCardPdf(data) {
+async function makeCardPdf(data, capturePreview = null) {
   const front=await thumbnail(data.front);
   let back, late;
   try {
@@ -255,6 +255,13 @@ async function makeCardPdf(data) {
       ctx.fillStyle="#183a2e";ctx.fillText("下半月（16 日至月底）",634,712);
       paintFit(ctx,late,634,730,550,382,data.lateRotation);
     }else paintFit(ctx,back,634,312,550,800,data.backRotation);
+    if(capturePreview){
+      const card=document.createElement("canvas");card.width=900;card.height=630;
+      card.getContext("2d",{alpha:false}).drawImage(c,45,268,1150,850,0,0,card.width,card.height);
+      const frame=await new Promise(resolve=>card.toBlob(resolve,"image/jpeg",.72));
+      if(!frame||frame.size>262144)throw Error("preview-size");
+      capturePreview(frame);
+    }
     ctx.fillStyle="#183a2e";ctx.font="bold 26px sans-serif";ctx.fillText("每日工时（小时:分钟）",56,1162);
     ctx.font="22px sans-serif";
     for(const [day,m] of Object.entries(data.daily)){
@@ -337,7 +344,8 @@ async function processCard(submit){
   if(busy)return;setBusy(true);
   try{
     const data=cardData();
-    const pdf=await makeCardPdf(data);
+    let previewImage;
+    const pdf=await makeCardPdf(data,submit?image=>{previewImage=image;}:null);
     if(pdf.size>3145728)throw Error("size");
     showPreview(pdf);
     if(!submit){say("一页 PDF 已生成，可先核对。");return;}
@@ -346,6 +354,8 @@ async function processCard(submit){
     const path=await rpc("prepare_card",{card_id:cardId,selected_project:data.project.id,worker_ref:data.worker.ref,
       work_month:data.month+"-01",minutes_by_day:data.daily,advance:data.advance,remarks:data.notes});
     const digest=[...new Uint8Array(await crypto.subtle.digest("SHA-256",await pdf.arrayBuffer()))].map(x=>x.toString(16).padStart(2,"0")).join("");
+    await api("storage/v1/object/kkt-site-card-previews-staging/"+path.replace(/\.pdf$/, ".jpg"),
+      previewImage,"POST","image/jpeg",{"x-upsert":"true"});
     await api("storage/v1/object/kkt-site-intake-staging/"+path,pdf,"POST","application/pdf",{"x-upsert":"true"});
     await rpc("submit_card",{card_id:cardId,checksum:digest});
     get("front").value="";get("back").value="";get("late").value="";
