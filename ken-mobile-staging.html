@@ -13,8 +13,8 @@
   <link rel="icon" href="./icon.png">
   <link rel="apple-touch-icon" href="./icon.png">
   <link rel="stylesheet" href="./styles.css">
-  <link rel="stylesheet" href="./ken-mobile-staging.css?v=3">
-  <script src="./ken-mobile-staging.js?v=3" defer></script>
+  <link rel="stylesheet" href="./ken-mobile-staging.css?v=4">
+  <script src="./ken-mobile-staging.js?v=4" defer></script>
 </head>
 <body>
   <header class="top">
@@ -83,6 +83,11 @@
         <ul class="update-list" id="updates"></ul>
         <p class="sub empty" id="empty" hidden>此账号暂无授权的工程记录。</p>
       </section>
+      <section class="card module-panel" aria-labelledby="source-documents-title">
+        <h2 id="source-documents-title">工程原件索引</h2>
+        <p class="sub source-status" id="documents-source-status" role="status"></p>
+        <ul class="update-list" id="documents-source-list"></ul>
+      </section>
       </section>
 
       <section class="card module-panel" id="workers" aria-labelledby="workers-title" hidden>
@@ -93,18 +98,27 @@
 
       <section class="card module-panel" id="cash" aria-labelledby="cash-title" hidden>
         <h2 id="cash-title">Petty Cash 管理</h2>
-        <p class="sub">正在核对主管账册、收据和期初余额。</p>
+        <p class="sub">主管账册仍在核对，以下显示已找到的来源。</p>
+        <p class="sub source-status" id="cash-source-status" role="status"></p>
+        <ul class="update-list" id="cash-source-list"></ul>
         <dl class="cash-summary">
           <div><dt>期初余额</dt><dd>待核对</dd></div>
           <div><dt>工程支出</dt><dd>待接入账册</dd></div>
           <div><dt>补款</dt><dd>待接入审批记录</dd></div>
         </dl>
+        <section class="subsection" aria-labelledby="ubs-title">
+          <h2 id="ubs-title">UBS Accounting</h2>
+          <p class="sub source-status" id="ubs-source-status" role="status"></p>
+          <ul class="update-list" id="ubs-source-list"></ul>
+        </section>
       </section>
 
       <section class="card module-panel" id="rent" aria-labelledby="rent-title" hidden>
         <h2 id="rent-title">私人产业租金</h2>
         <p class="sub" id="rent-status" role="status"></p>
         <ul class="update-list" id="rent-list"></ul>
+        <p class="sub source-status" id="rent-source-status" role="status"></p>
+        <ul class="update-list" id="rent-source-list"></ul>
       </section>
     </div>
   </main>

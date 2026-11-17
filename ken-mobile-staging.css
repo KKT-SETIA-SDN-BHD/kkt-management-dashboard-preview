@@ -94,3 +94,6 @@
 @media (max-width: 620px) {
   .module-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+.source-status:empty { display: none; }
+.subsection { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }

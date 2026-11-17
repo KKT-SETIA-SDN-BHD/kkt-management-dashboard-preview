@@ -14,6 +14,7 @@ const projectFilter = byId('project-filter');
 let accessToken;
 let visibleUpdates = [];
 let rentalLoaded = false;
+const sourceSections = ['documents', 'cash', 'ubs', 'rent'];
 const moduleButtons = [...document.querySelectorAll('[data-module]')];
 
 function gatewayCall(path, token, data) {
@@ -40,6 +41,10 @@ function clearSession() {
   rentalLoaded = false;
   byId('rent-list').replaceChildren();
   byId('rent-status').textContent = '';
+  for (const name of sourceSections) {
+    byId(name + '-source-list').replaceChildren();
+    byId(name + '-source-status').textContent = '';
+  }
   selectModule('engineering');
   signout.hidden = true;
   signin.hidden = false;
@@ -88,6 +93,7 @@ signin.addEventListener('submit', async event => {
     signout.hidden = false;
     setStatus('');
     renderUpdates();
+    void loadSourceReviews(session.access_token);
   } catch {
     const token = clearSession();
     if (token) void gatewayCall('auth/v1/logout?scope=local', token).catch(() => {});
@@ -135,6 +141,41 @@ function selectModule(moduleName) {
   }
 }
 
+async function loadSourceReviews(token) {
+  for (const name of sourceSections) byId(name + '-source-status').textContent = '正在读取来源…';
+  try {
+    const response = await mobileRead('source-review', token);
+    if (!response.ok) throw Error('Source reviews unavailable');
+    const { items } = await response.json();
+    if (!Array.isArray(items)) throw Error('Invalid source response');
+    if (token !== accessToken) return;
+
+    for (const name of sourceSections) {
+      const records = items.filter(item => item?.section === name);
+      byId(name + '-source-status').textContent = records.length ? '' : '此账号暂无已核对来源。';
+      byId(name + '-source-list').replaceChildren(...records.map(item => {
+        const row = document.createElement('li');
+        const heading = document.createElement('header');
+        const title = document.createElement('strong');
+        const date = document.createElement('time');
+        const note = document.createElement('p');
+        title.textContent = item.label;
+        date.className = 'meta';
+        date.dateTime = date.textContent = item.source_date;
+        note.textContent = item.review_note;
+        heading.append(title, date);
+        row.append(heading, note);
+        return row;
+      }));
+    }
+  } catch {
+    if (token !== accessToken) return;
+    for (const name of sourceSections) {
+      byId(name + '-source-status').textContent = '暂时无法读取来源。';
+    }
+  }
+}
+
 async function loadRental() {
   const token = accessToken;
   if (!token || rentalLoaded) return;
@@ -157,7 +198,7 @@ async function loadRental() {
       row.append(name, periods);
       return row;
     }));
-    status.textContent = items.length ? '显示本人名下的已登记产业。' : 'Staging 暂无本人名下的已核对租金记录。';
+    status.textContent = items.length ? '显示本人名下的已登记产业。' : '本人名下的正式租金台账待接入。';
   } catch {
     if (token !== accessToken) return;
     rentalLoaded = false;
