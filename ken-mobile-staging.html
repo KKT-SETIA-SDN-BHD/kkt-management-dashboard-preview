@@ -9,12 +9,12 @@
   <meta name="robots" content="noindex, nofollow">
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
-  <title>Mr Ken Mobile · 工程资料</title>
+  <title>Mr Ken Mobile · 管理概览</title>
   <link rel="icon" href="./icon.png">
   <link rel="apple-touch-icon" href="./icon.png">
   <link rel="stylesheet" href="./styles.css">
-  <link rel="stylesheet" href="./ken-mobile-staging.css?v=2">
-  <script src="./ken-mobile-staging.js?v=2" defer></script>
+  <link rel="stylesheet" href="./ken-mobile-staging.css?v=3">
+  <script src="./ken-mobile-staging.js?v=3" defer></script>
 </head>
 <body>
   <header class="top">
@@ -28,8 +28,8 @@
     <section class="hero" id="overview" aria-labelledby="overview-title">
       <div>
         <p class="eyebrow">STAGING</p>
-        <h1 id="overview-title">工程资料</h1>
-        <p class="sub" id="intro">登录查看获授权工程的原件核对记录。</p>
+        <h1 id="overview-title">管理概览</h1>
+        <p class="sub" id="intro">登录查看获授权的管理模块。</p>
       </div>
     </section>
 
@@ -45,11 +45,14 @@
     <p class="status" id="status" role="status" aria-live="polite"></p>
 
     <div id="results" hidden>
-      <nav class="tabs" aria-label="工程资料导航">
-        <a href="#overview">概览</a>
-        <a href="#records">原件记录</a>
+      <nav class="module-nav" aria-label="管理模块">
+        <button type="button" data-module="engineering" aria-pressed="true" aria-controls="engineering">工程管理</button>
+        <button type="button" data-module="workers" aria-pressed="false" aria-controls="workers">工人管理</button>
+        <button type="button" data-module="cash" aria-pressed="false" aria-controls="cash">Petty Cash 管理</button>
+        <button type="button" data-module="rent" aria-pressed="false" aria-controls="rent">私人产业租金</button>
       </nav>
 
+      <section id="engineering" aria-label="工程管理">
       <section class="metrics" aria-label="工程资料概览">
         <div class="metric">
           <h2>原件记录</h2>
@@ -79,6 +82,29 @@
         </div>
         <ul class="update-list" id="updates"></ul>
         <p class="sub empty" id="empty" hidden>此账号暂无授权的工程记录。</p>
+      </section>
+      </section>
+
+      <section class="card module-panel" id="workers" aria-labelledby="workers-title" hidden>
+        <h2 id="workers-title">工人管理</h2>
+        <p class="sub">工人登记、工卡及证件到期提醒。当前入口使用 Staging 测试资料。</p>
+        <a class="module-link" href="./ken-staging-login.html" target="_blank" rel="noopener noreferrer">打开工人管理</a>
+      </section>
+
+      <section class="card module-panel" id="cash" aria-labelledby="cash-title" hidden>
+        <h2 id="cash-title">Petty Cash 管理</h2>
+        <p class="sub">正在核对主管账册、收据和期初余额。</p>
+        <dl class="cash-summary">
+          <div><dt>期初余额</dt><dd>待核对</dd></div>
+          <div><dt>工程支出</dt><dd>待接入账册</dd></div>
+          <div><dt>补款</dt><dd>待接入审批记录</dd></div>
+        </dl>
+      </section>
+
+      <section class="card module-panel" id="rent" aria-labelledby="rent-title" hidden>
+        <h2 id="rent-title">私人产业租金</h2>
+        <p class="sub" id="rent-status" role="status"></p>
+        <ul class="update-list" id="rent-list"></ul>
       </section>
     </div>
   </main>
