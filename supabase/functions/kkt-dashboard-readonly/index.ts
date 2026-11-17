@@ -21,7 +21,9 @@ Deno.serve(async (request) => {
   if (request.method !== "GET") return reply(405,"METHOD_NOT_ALLOWED");
   const url = new URL(request.url);
   const resource = url.pathname.split("/").filter(Boolean).at(-1);
-  if (!resource || !resources.has(resource) || url.pathname !== "/functions/v1/kkt-dashboard-readonly/" + resource) return reply(404,"NOT_FOUND");
+  const route = `/kkt-dashboard-readonly/${resource}`;
+  if (!resource || !resources.has(resource) ||
+      ![route, `/functions/v1${route}`, `/${resource}`].includes(url.pathname)) return reply(404,"NOT_FOUND");
   const authorization = request.headers.get("authorization") || "";
   if (!/^Bearer\s+\S+$/i.test(authorization)) return reply(401,"AUTH_REQUIRED");
   const client = createClient(supabaseUrl,publishableKey,{auth:{persistSession:false,autoRefreshToken:false},global:{headers:{Authorization:authorization}}});
