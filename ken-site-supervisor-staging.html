@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; img-src blob:; style-src 'unsafe-inline'; script-src 'sha256-xxZ/Uf01FyuGCXKE/lQMqiCrlZo4q5nQYCeDOwdLRR0='; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; img-src blob:; style-src 'unsafe-inline'; script-src 'sha256-HzksBfk6V0yW2eGvCJRU84440TQeF2J37RK/DHoucHI='; base-uri 'none'; form-action 'none'">
 <title>KKT Site Supervisor</title>
 <style>
 *{box-sizing:border-box}html{color-scheme:light}body{margin:0;background:#eef4f1;color:#152d24;font:16px/1.5 system-ui,sans-serif}
@@ -51,6 +51,7 @@ a{color:#15533e;text-underline-offset:3px}summary{font-weight:700;cursor:pointer
 <a id="pdf-open" hidden target="_blank" rel="noopener noreferrer">打开一页 PDF</a>
 </form></section>
 <section id="petty"><h2>Petty Cash</h2><form id="cash-form">
+<label for="cash-site">工地</label><input id="cash-site" maxlength="250" placeholder="临时外派时填写实际工地">
 <div class="two"><div><label for="date">支出日期</label><input id="date" type="date" required></div>
 <div><label for="amount">金额（RM）</label><input id="amount" type="number" min=".01" max="999999" step=".01" inputmode="decimal" required></div></div>
 <label for="expense">用途</label><input id="expense" maxlength="300" required>
@@ -328,6 +329,7 @@ get("login").addEventListener("submit",async e=>{
     if(!scope?.projects?.length&&!scope?.office&&!scope?.petty_cash){clearSession();say("此账号尚未获准使用工卡、Petty Cash 或办公室复核。");return;}
     for(const id of ["workcard","workcard-link"])get(id).hidden=!scope.projects.length;
     for(const id of ["petty","petty-link"])get(id).hidden=!scope.petty_cash;
+    get("cash-site").value=scope.petty_cash_default_site??"";
     for(const id of ["office","office-link"])get(id).hidden=!scope.office;
     fill(get("project"),scope.projects,x=>x.id,x=>x.name,"请选择工程");
     fillWorkers();get("login-panel").hidden=true;get("workspace").hidden=false;say("");
@@ -368,11 +370,12 @@ get("preview").addEventListener("click",()=>processCard(false));
 get("card-form").addEventListener("submit",event=>{event.preventDefault();processCard(true);});
 get("cash-form").addEventListener("submit",async e=>{
   e.preventDefault();if(busy)return;setBusy(true);
-  const data={selected_project:null,claim_date:get("date").value,amount:Number(get("amount").value),
+  const data={site_name:get("cash-site").value.trim(),claim_date:get("date").value,amount:Number(get("amount").value),
     details:get("expense").value.trim(),receipt:get("receipt").value.trim()};
   const identity=JSON.stringify(data);
   if(cashIdentity!==identity){cashIdentity=identity;cashId=crypto.randomUUID();}
-  try{await rpc("submit_petty_cash",{claim_id:cashId,...data});
+  try{await rpc("submit_petty_cash_at_site",{claim_id:cashId,...data});
+    get("cash-site").value=scope.petty_cash_default_site??"";
     get("amount").value="";get("expense").value="";get("receipt").value="";cashId=null;cashIdentity="";
     say("Petty Cash 已交办公室复核。");
   }catch(error){presentError(error,"Petty Cash 未提交，请检查资料后重试。");}
@@ -400,7 +403,7 @@ get("office-form").addEventListener("submit",async e=>{
       get("office-items").append(li);
     }
     for(const row of queue.petty_cash){
-      const li=document.createElement("li");li.textContent=row.spent_on+" · "+row.supervisor+" · RM "+Number(row.amount_rm).toFixed(2)+" · "+row.description;
+      const li=document.createElement("li");li.textContent=row.spent_on+" · "+row.supervisor+(row.site?" · "+row.site:"")+" · RM "+Number(row.amount_rm).toFixed(2)+" · "+row.description;
       get("office-items").append(li);
     }
   }catch(error){presentError(error,"无法读取复核月份。");}
@@ -469,8 +472,8 @@ function reviewWorkbook(batch) {
     if(!submitted.has(worker.employee_ref))summary.push([worker.employee_ref,worker.name,worker.project,month,null,null,null,
       ...Array(11).fill(null),"No submission","Check expected workers for this month",null,null]);
   }
-  const petty=[["Date","Site Supervisor","Amount RM","Purpose","Receipt Reference","Office Review"]];
-  for(const r of batch.petty_cash)petty.push([r.spent_on,r.supervisor,Number(r.amount_rm),r.description,r.receipt_reference,"Pending verification"]);
+  const petty=[["Date","Site Supervisor","Site","Amount RM","Purpose","Receipt Reference","Office Review"]];
+  for(const r of batch.petty_cash)petty.push([r.spent_on,r.supervisor,r.site,Number(r.amount_rm),r.description,r.receipt_reference,"Pending verification"]);
   const sheets=[["Payroll Review",summary],["Daily Work Hours",daily],["Petty Cash",petty]];
   const documentRel="http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
   const root="http://schemas.openxmlformats.org/package/2006/";
