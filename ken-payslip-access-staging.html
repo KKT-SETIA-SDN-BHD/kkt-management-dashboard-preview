@@ -2,7 +2,7 @@
 <html lang="zh-Hans"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; img-src data: blob:; style-src 'unsafe-inline'; script-src 'sha256-EH9n+ZKLc6deJj5xWpC2Le6UUQHzA2zZ0dOvjP0QPOw='; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; img-src data: blob:; style-src 'unsafe-inline'; script-src 'sha256-dPaBNE9D9Y7lDlbM9nRf3ZAcTQMHZFbKw1qEEHK5qD0='; base-uri 'none'; form-action 'none'">
 <title>KKT 工资单查阅与列印</title>
 <style>
 :root{font-family:system-ui,sans-serif;color:#15273c;background:#f0f3f8}*{box-sizing:border-box}
@@ -516,7 +516,7 @@ async function loadWorkerCard(month = null) {
   workcardRecord = card;
   get("hr-card-month").value = card.month.slice(0,7);
   get("hr-card-meta").textContent = [card.employee_ref,card.name,card.month.slice(0,7),card.project].filter(Boolean).join(" · ");
-  get("hr-card-total").textContent = workerHours(card.total_minutes);
+  get("hr-card-total").textContent = card.total_minutes == null ? "待按工卡照片核对" : workerHours(card.total_minutes);
   get("hr-card-advance").textContent = card.advance_rm == null ? "待核对" : "RM " + Number(card.advance_rm).toFixed(2);
   get("hr-card-notes").textContent = card.notes || "—";
   for (const [day, minutes] of Object.entries(card.daily_minutes || {}).sort()) {
