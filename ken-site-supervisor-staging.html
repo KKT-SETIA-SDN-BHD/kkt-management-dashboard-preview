@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; img-src blob:; style-src 'unsafe-inline'; script-src 'sha256-HzksBfk6V0yW2eGvCJRU84440TQeF2J37RK/DHoucHI='; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; img-src blob:; style-src 'unsafe-inline'; script-src 'sha256-bw6So/ZO1SwhnELcPfctV7E9cg4/AoiH7oT+5fCG2XQ='; base-uri 'none'; form-action 'none'">
 <title>KKT Site Supervisor</title>
 <style>
 *{box-sizing:border-box}html{color-scheme:light}body{margin:0;background:#eef4f1;color:#152d24;font:16px/1.5 system-ui,sans-serif}
@@ -14,7 +14,7 @@ input,select,textarea{width:100%;padding:8px 10px;border:1px solid #82998c;borde
 button{min-height:44px;padding:8px 13px;border:0;border-radius:7px;background:#15533e;color:#fff;font-weight:700;cursor:pointer}
 button:disabled{opacity:.58;cursor:wait}.secondary{background:#e2eee7;color:#15533e}
 a{color:#15533e;text-underline-offset:3px}summary{font-weight:700;cursor:pointer}.muted{color:#425d50}form>button,.flex{margin-top:10px}.flex{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:8px 12px}.hours{display:grid;grid-template-columns:repeat(auto-fit,minmax(75px,1fr));gap:5px 8px}.hours label{font-size:.8rem;margin:4px 0}.hours input{padding:6px}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:8px 12px}
 #status{position:sticky;top:4px;z-index:1;background:#e1efe6;border:1px solid #b8d1c0;padding:8px 10px;border-radius:8px}#status:empty{display:none}
 #pdf-open{display:inline-block;padding:9px 0}.office-list{padding-left:19px;overflow-wrap:anywhere}.office-list li{margin-bottom:8px}
 [hidden]{display:none!important}:focus-visible{outline:3px solid #2c8266;outline-offset:3px}
@@ -32,7 +32,7 @@ a{color:#15533e;text-underline-offset:3px}summary{font-weight:700;cursor:pointer
 <div class="two"><div><label for="project">工程</label><select id="project" required></select></div>
 <div><label for="employee">工人</label><select id="employee" required></select></div></div>
 <label for="month">工卡月份</label><input id="month" type="month" required>
-<p class="muted">每次只拍同一工人的一张月卡。请把卡放平，拍清四边和字迹，避免多张卡重叠。</p>
+<p class="muted">每次只拍同一工人的一张月卡。请把卡放平，拍清四边和每日工时栏，避免多张卡重叠。</p>
 <div class="two"><div><label for="front">1. 拍封面（姓名、员工代号、月份、预支）</label><input id="front" type="file" accept="image/*" capture="environment" required>
 <label for="front-rotation">封面旋转</label><select id="front-rotation" aria-label="封面顺时针旋转"><option value="0">不旋转</option><option value="90">顺时针 90°</option><option value="180">180°</option><option value="270">顺时针 270°</option></select></div>
 <div><label for="back-mode">2. 内页拍法</label><select id="back-mode"><option value="full">整张内页（上、下半月同框）</option><option value="split">上、下半月分开拍</option></select>
@@ -40,11 +40,6 @@ a{color:#15533e;text-underline-offset:3px}summary{font-weight:700;cursor:pointer
 <label for="back-rotation">内页旋转</label><select id="back-rotation" aria-label="内页顺时针旋转"><option value="0">不旋转</option><option value="90">顺时针 90°</option><option value="180">180°</option><option value="270">顺时针 270°</option></select>
 <div id="late-photo" hidden><label for="late">拍下半月（第 16 日至月底）</label><input id="late" type="file" accept="image/*" capture="environment" disabled>
 <label for="late-rotation">下半月旋转</label><select id="late-rotation" aria-label="下半月顺时针旋转"><option value="0">不旋转</option><option value="90">顺时针 90°</option><option value="180">180°</option><option value="270">顺时针 270°</option></select></div></div></div>
-<details open><summary>每日工时（按工卡工时栏录入）</summary>
-<p class="muted">卡上写 10，可直接填 10 小时。也可输入 8:30。横线或模糊格先留空，只有确认无工时才填 0。</p>
-<div id="days" class="hours"></div>
-<p><strong id="total-hours">合计 0:00</strong></p>
-</details>
 <div class="two"><div><label for="advance">封面预支 Advance（RM）</label><input id="advance" type="number" min="0" max="999999" step=".01" inputmode="decimal" placeholder="无记录可留空"></div>
 <div><label for="notes">补充资料</label><textarea id="notes" maxlength="120" rows="2"></textarea></div></div>
 <div class="flex"><button id="preview" type="button" class="secondary">生成 PDF 预览</button><button>提交办公室</button></div>
@@ -124,22 +119,6 @@ function fillWorkers() {
 function hourText(minutes) {
   return Math.floor(minutes/60)+":"+String(minutes%60).padStart(2,"0");
 }
-function parseDailyTime(raw) {
-  const text=String(raw).trim();
-  if(!text)return null;
-  const match=text.match(/^(\d{1,2})(?::([0-5]\d))?$/);
-  const minutes=match?Number(match[1])*60+Number(match[2]||0):-1;
-  return minutes>=0&&minutes<=1440?minutes:NaN;
-}
-function updateTotal() {
-  let total=0, invalid=false;
-  for(const input of get("days").querySelectorAll("input")) {
-    const minutes=parseDailyTime(input.value);
-    if(Number.isNaN(minutes))invalid=true;
-    else if(minutes!==null)total+=minutes;
-  }
-  get("total-hours").textContent=invalid?"请修正无效工时":"合计 "+hourText(total);
-}
 function syncPhotoMode(clear=false) {
   const split=get("back-mode").value==="split";
   get("back-label").textContent=split?"拍上半月（第 1 至 15 日）":"拍整张内页（第 1 日至月底）";
@@ -150,34 +129,11 @@ function syncPhotoMode(clear=false) {
   if(clear||!split)get("late").value="";
   resetPreview();
 }
-function buildDays() {
-  const value=get("month").value;
-  const entries=new Map([...get("days").querySelectorAll("input")].map(i=>[i.name,i.value]));
-  get("days").replaceChildren();
-  if(!/^\d{4}-\d{2}$/.test(value))return;
-  const [year,month]=value.split("-").map(Number);
-  const dayCount=new Date(Date.UTC(year,month,0)).getUTCDate();
-  for(let day=1;day<=dayCount;day++){
-    const label=document.createElement("label");label.textContent=day+" 日";
-    const input=document.createElement("input");input.name=String(day).padStart(2,"0");
-    input.placeholder="8:30";input.maxLength=5;input.autocomplete="off";
-    input.value=entries.get(input.name)||"";label.append(input);get("days").append(label);
-  }
-  updateTotal();
-}
 function cardData() {
   if(!get("card-form").reportValidity())throw Error("form");
   const workers=scope.workers.filter(w=>w.project_id===get("project").value&&w.ref===get("employee").value);
   if(workers.length!==1)throw Error("worker");
-  const daily={};
-  for(const input of get("days").querySelectorAll("input")){
-    const minutes=parseDailyTime(input.value);
-    if(minutes===null)continue;
-    if(Number.isNaN(minutes)){input.focus();throw Error("hours");}
-    daily[input.name]=minutes;
-  }
-  if(!Object.keys(daily).length)throw Error("hours");
-  return {worker:workers[0],month:get("month").value,daily,
+  return {worker:workers[0],month:get("month").value,
     advance:get("advance").value===""?null:Number(get("advance").value),notes:get("notes").value.trim(),
     project:scope.projects.find(p=>p.id===get("project").value),front:get("front").files[0],back:get("back").files[0],
     late:get("back-mode").value==="split"?get("late").files[0]:null,
@@ -243,7 +199,7 @@ async function makeCardPdf(data, capturePreview = null) {
     const ctx=c.getContext("2d",{alpha:false});ctx.fillStyle="#fff";ctx.fillRect(0,0,c.width,c.height);
     ctx.fillStyle="#164e3b";ctx.fillRect(0,0,c.width,155);
     ctx.fillStyle="#fff";ctx.font="bold 44px sans-serif";ctx.fillText("KKT SETIA SDN. BHD.  |  月度工卡",56,70);
-    ctx.font="27px sans-serif";ctx.fillText("STAGING · 人工录入工时 · 待办公室复核",56,117);
+    ctx.font="27px sans-serif";ctx.fillText("STAGING · 工卡扫描 · 待办公室复核",56,117);
     ctx.fillStyle="#183a2e";ctx.font="bold 28px sans-serif";
     ctx.fillText(data.worker.ref+" · "+(data.worker.name||""),56,208,1128);
     ctx.font="24px sans-serif";ctx.fillText(data.month+" · "+data.project.name,56,245,1128);
@@ -262,17 +218,12 @@ async function makeCardPdf(data, capturePreview = null) {
       if(!frame||frame.size>262144)throw Error("preview-size");
       capturePreview(frame);
     }
-    ctx.fillStyle="#183a2e";ctx.font="bold 26px sans-serif";ctx.fillText("每日工时（小时:分钟）",56,1162);
-    ctx.font="22px sans-serif";
-    for(const [day,m] of Object.entries(data.daily)){
-      const pos=Number(day)-1;
-      ctx.fillText(day+" 日  "+hourText(m),56+(pos%5)*229,1210+Math.floor(pos/5)*39);
-    }
-    const total=Object.values(data.daily).reduce((a,b)=>a+b,0);
-    ctx.font="bold 26px sans-serif";ctx.fillText("总工时 "+hourText(total)+"     Advance "+(data.advance==null?"未录入":"RM "+data.advance.toFixed(2)),56,1500,1128);
+    ctx.fillStyle="#183a2e";ctx.font="bold 26px sans-serif";
+    ctx.fillText("每日工时：待按工卡照片核对",56,1190,1128);
+    ctx.fillText("Advance "+(data.advance==null?"未录入":"RM "+data.advance.toFixed(2)),56,1240,1128);
     ctx.font="22px sans-serif";
     writeCanvasText(ctx,"备注："+(data.notes||"无"),1128).slice(0,4).forEach((line,i)=>ctx.fillText(line,56,1550+i*32));
-    ctx.fillText("工卡照片及录入值供公司复核。",56,1703);
+    ctx.fillText("请以本页工卡照片核对每日工时。",56,1703);
     const raster=await new Promise(resolve=>c.toBlob(resolve,"image/jpeg",.84));
     if(!raster)throw Error("image");
     return jpegPdf(new Uint8Array(await raster.arrayBuffer()),c.width,c.height);
@@ -291,7 +242,7 @@ function clearSession() {
   resetPreview();get("workspace").hidden=true;get("login-panel").hidden=false;
   get("card-form").reset();syncPhotoMode();get("cash-form").reset();get("office-items").replaceChildren();get("office-count").textContent="";
   get("month").value=today.slice(0,7);get("review-month").value=today.slice(0,7);get("date").value=today;
-  buildDays();cardId=null;cardIdentity="";cashId=null;cashIdentity="";
+  cardId=null;cardIdentity="";cashId=null;cashIdentity="";
 }
 async function openTemporaryPdf(path, checksum, title){
   const resp=await api("storage/v1/object/authenticated/kkt-site-intake-staging/"+path,undefined,"GET");
@@ -308,14 +259,13 @@ function downloadBlob(blob, name) {
 function clearCardInputs() {
   for(const id of ["front","back","late","advance","notes"])get(id).value="";
   for(const id of ["front-rotation","back-rotation","late-rotation"])get(id).value="0";
-  get("days").replaceChildren();buildDays();resetPreview();
+  resetPreview();
 }
 get("project").addEventListener("change",()=>{fillWorkers();clearCardInputs();});
 get("employee").addEventListener("change",clearCardInputs);
 get("month").addEventListener("change",clearCardInputs);
 get("back-mode").addEventListener("change",()=>syncPhotoMode(true));
 get("card-form").addEventListener("input",resetPreview);
-get("days").addEventListener("input",updateTotal);
 clearSession();
 
 get("login").addEventListener("submit",async e=>{
@@ -353,7 +303,7 @@ async function processCard(submit){
     const identity=data.project.id+"/"+data.worker.ref+"/"+data.month;
     if(identity!==cardIdentity){cardId=crypto.randomUUID();cardIdentity=identity;}
     const path=await rpc("prepare_card",{card_id:cardId,selected_project:data.project.id,worker_ref:data.worker.ref,
-      work_month:data.month+"-01",minutes_by_day:data.daily,advance:data.advance,remarks:data.notes});
+      work_month:data.month+"-01",minutes_by_day:{},advance:data.advance,remarks:data.notes});
     const digest=[...new Uint8Array(await crypto.subtle.digest("SHA-256",await pdf.arrayBuffer()))].map(x=>x.toString(16).padStart(2,"0")).join("");
     await api("storage/v1/object/kkt-site-card-previews-staging/"+path.replace(/\.pdf$/, ".jpg"),
       previewImage,"POST","image/jpeg",{"x-upsert":"true"});
@@ -362,8 +312,7 @@ async function processCard(submit){
     get("front").value="";get("back").value="";get("late").value="";
     say("工卡已交办公室复核，OneDrive 归档状态待处理。");
   }catch(error){
-    if(error.message==="hours")say("请输入至少一天有效工时，例如 8:30。");
-    else if(error.message!=="form")presentError(error,"工卡未提交。请检查照片与网络，再试一次。");
+    if(error.message!=="form")presentError(error,"工卡未提交。请检查照片与网络，再试一次。");
   }finally{setBusy(false);}
 }
 get("preview").addEventListener("click",()=>processCard(false));
@@ -392,7 +341,7 @@ get("office-form").addEventListener("submit",async e=>{
     get("office-count").textContent="工卡 "+queue.cards.length+" 份 · 现有工地名单待核对 "+missing.length+" 人 · Petty Cash "+queue.petty_cash.length+" 笔";
     for(const row of queue.cards){
       const li=document.createElement("li");
-      li.textContent=[row.name,row.employee_ref,row.project,hourText(row.total_minutes),row.status==="archived"?"已归档":"待归档"].filter(Boolean).join(" · ");
+      li.textContent=[row.name,row.employee_ref,row.project,row.total_minutes==null?"工时待核对":hourText(row.total_minutes),row.status==="archived"?"已归档":"待归档"].filter(Boolean).join(" · ");
       const archive=driveLink(row.onedrive_drive_id,row.onedrive_item_id);
       if(archive){const a=document.createElement("a");a.href=archive;a.target="_blank";a.rel="noopener noreferrer";a.textContent="OneDrive PDF";li.append(" ",a);}
       else{
@@ -460,8 +409,8 @@ function reviewWorkbook(batch) {
     "Employee EIS RM","Employer EIS RM","PCB RM","Other Deductions RM","Net Pay RM","Archive Status","Office Review","Notes","OneDrive"]];
   const daily=[["Employee Code","Name","Project","Month","Day","Work Minutes","Work Hours"]];
   for(const r of batch.cards){
-    summary.push([r.employee_ref,r.name,r.project,r.month,Number(r.total_minutes),Number((r.total_minutes/60).toFixed(4)),r.advance_rm==null?null:Number(r.advance_rm),
-      ...Array(11).fill(null),r.status==="archived"?"Archived":"Pending archive","Pending verification",r.notes,driveLink(r.onedrive_drive_id,r.onedrive_item_id)]);
+    summary.push([r.employee_ref,r.name,r.project,r.month,r.total_minutes==null?null:Number(r.total_minutes),r.total_minutes==null?null:Number((r.total_minutes/60).toFixed(4)),r.advance_rm==null?null:Number(r.advance_rm),
+      ...Array(11).fill(null),r.status==="archived"?"Archived":"Pending archive",r.total_minutes==null?"Pending work-card review":"Pending verification",r.notes,driveLink(r.onedrive_drive_id,r.onedrive_item_id)]);
     for(const [day,minutes] of Object.entries(r.daily_minutes).sort()){
       daily.push([r.employee_ref,r.name,r.project,r.month,Number(day),Number(minutes),Number((minutes/60).toFixed(4))]);
     }
