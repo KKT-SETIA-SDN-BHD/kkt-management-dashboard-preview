@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co; img-src blob:; style-src 'unsafe-inline'; script-src 'sha256-bw6So/ZO1SwhnELcPfctV7E9cg4/AoiH7oT+5fCG2XQ='; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://qacmlpqtiwwmrypxnnlp.supabase.co https://cdn.jsdelivr.net; worker-src blob:; img-src blob:; style-src 'unsafe-inline'; script-src 'sha256-KZkx/PneIrptKvDw/4VID7xED7oEi8VBdx8C9ilBXyw=' https://cdn.jsdelivr.net 'wasm-unsafe-eval'; base-uri 'none'; form-action 'none'">
 <title>KKT Site Supervisor</title>
 <style>
 *{box-sizing:border-box}html{color-scheme:light}body{margin:0;background:#eef4f1;color:#152d24;font:16px/1.5 system-ui,sans-serif}
@@ -40,6 +40,7 @@ a{color:#15533e;text-underline-offset:3px}summary{font-weight:700;cursor:pointer
 <label for="back-rotation">内页旋转</label><select id="back-rotation" aria-label="内页顺时针旋转"><option value="0">不旋转</option><option value="90">顺时针 90°</option><option value="180">180°</option><option value="270">顺时针 270°</option></select>
 <div id="late-photo" hidden><label for="late">拍下半月（第 16 日至月底）</label><input id="late" type="file" accept="image/*" capture="environment" disabled>
 <label for="late-rotation">下半月旋转</label><select id="late-rotation" aria-label="下半月顺时针旋转"><option value="0">不旋转</option><option value="90">顺时针 90°</option><option value="180">180°</option><option value="270">顺时针 270°</option></select></div></div></div>
+<p id="ocr-summary" class="muted" role="status">预览或提交时自动识别内页工时。</p>
 <div class="two"><div><label for="advance">封面预支 Advance（RM）</label><input id="advance" type="number" min="0" max="999999" step=".01" inputmode="decimal" placeholder="无记录可留空"></div>
 <div><label for="notes">补充资料</label><textarea id="notes" maxlength="120" rows="2"></textarea></div></div>
 <div class="flex"><button id="preview" type="button" class="secondary">生成 PDF 预览</button><button>提交办公室</button></div>
@@ -57,6 +58,7 @@ a{color:#15533e;text-underline-offset:3px}summary{font-weight:700;cursor:pointer
 <p id="office-count" class="muted"></p><ul id="office-items" class="office-list"></ul>
 <button id="excel" type="button" disabled>导出 Excel 核查表</button>
 </section></div></main>
+<script defer src="https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.min.js" integrity="sha384-r1ru3tcf6FhnCFR4B7pIFG+BhFF9LlFtz/P1y4pblWn3AGs9y3lBx5SKLNf4+rED" crossorigin="anonymous"></script>
 <script>"use strict";
 const projectUrl = "https://qacmlpqtiwwmrypxnnlp.supabase.co";
 const key = "sb_publishable_ksPgK2lE7Uqo-goo8GP2XQ_u_HyjRM7";
@@ -154,6 +156,90 @@ function paintFit(ctx,img,x,y,w,h,rotation=0) {
   ctx.drawImage(img,-dw/2,-dh/2,dw,dh);
   ctx.restore();
 }
+function scanTimes(tsv, firstDay, lastDay) {
+  const words=tsv.trim().split(/\r?\n/).slice(1).map(line=>{
+    const [level,,,,,,left,top,width,height,confidence,text=""]=line.split("\t");
+    return {level:Number(level),x:Number(left)+Number(width)/2,y:Number(top)+Number(height)/2,
+      w:Number(width),h:Number(height),confidence:Number(confidence),text:text.trim()};
+  }).filter(word=>word.level===5&&word.confidence>=60&&word.w>0&&word.h>0);
+  const headers=words.filter(word=>/^(HOURS?|HRS?|JAM)$/i.test(word.text));
+  const days=words.filter(word=>/^(DATE|DAY|TARIKH|HARI)$/i.test(word.text));
+  const daily={};
+  const conflicts=new Set();
+  for(const header of headers){
+    const paired=days.filter(day=>day.x<header.x&&Math.abs(day.y-header.y)<=Math.max(day.h,header.h));
+    if(paired.length!==1)continue;
+    const date=paired[0], spacing=header.x-date.x;
+    if(spacing<Math.max(date.w,header.w))continue;
+    const next=days.filter(day=>day.y>date.y+date.h&&Math.abs(day.x-date.x)<=date.w).sort((a,b)=>a.y-b.y)[0];
+    const rowDates=words.filter(word=>word.y>date.y+date.h&&(!next||word.y<next.y)
+      &&Math.abs(word.x-date.x)<=Math.max(date.w*.65,date.h)&&/^\d{1,2}$/.test(word.text)
+      &&Number(word.text)>=firstDay&&Number(word.text)<=lastDay);
+    const anchored=rowDates.filter(day=>rowDates.some(other=>
+      Math.abs(Number(other.text)-Number(day.text))===1
+      &&(other.y-day.y)*(Number(other.text)-Number(day.text))>0
+      &&Math.abs(other.y-day.y)>Math.max(day.h,other.h)));
+    for(const day of anchored){
+      const cells=words.filter(word=>word.confidence>=80&&Math.abs(word.y-day.y)<=Math.max(day.h,word.h)*.55
+        &&Math.abs(word.x-header.x)<=Math.min(spacing*.35,Math.max(header.w*.85,header.h*1.8)));
+      if(cells.length!==1)continue;
+      const time=/^(\d{1,2})(?::([0-5]\d))?$/.exec(cells[0].text);
+      if(!time||Number(time[1])>24||Number(time[1])===24&&Number(time[2]||0)>0)continue;
+      const key=String(Number(day.text)).padStart(2,"0"), minutes=Number(time[1])*60+Number(time[2]||0);
+      if(Object.hasOwn(daily,key)&&daily[key]!==minutes)conflicts.add(key);
+      daily[key]=minutes;
+    }
+  }
+  for(const day of conflicts)delete daily[day];
+  return daily;
+}
+
+async function ocrImage(file,rotation) {
+  const bitmap=await thumbnail(file);
+  try{
+    const canvas=document.createElement("canvas"),scale=Math.min(1,2100/Math.max(bitmap.width,bitmap.height));
+    const swap=rotation===90||rotation===270;
+    canvas.width=Math.max(1,Math.round((swap?bitmap.height:bitmap.width)*scale));
+    canvas.height=Math.max(1,Math.round((swap?bitmap.width:bitmap.height)*scale));
+    paintFit(canvas.getContext("2d",{alpha:false}),bitmap,0,0,canvas.width,canvas.height,rotation);
+    return canvas;
+  }finally{bitmap.close();}
+}
+
+let lastScan;
+async function recognizeCard(data) {
+  const key=[data.back,data.late,data.backRotation,data.lateRotation,data.month];
+  if(lastScan&&key.every((field,index)=>field===lastScan.key[index]))return lastScan.daily;
+  const [year,month]=data.month.split("-").map(Number);
+  const lastDay=new Date(Date.UTC(year,month,0)).getUTCDate();
+  let worker, timer, expired=false;
+  const recognition=(async()=>{
+    if(!window.Tesseract)throw Error("OCR engine did not load");
+    worker=await window.Tesseract.createWorker("eng",1,{
+      workerPath:"https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/worker.min.js",
+      corePath:"https://cdn.jsdelivr.net/npm/tesseract.js-core@6.0.0",
+      langPath:"https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng@1.0.0/4.0.0_best_int",
+      cacheMethod:"none",
+      errorHandler:()=>{}
+    });
+    if(expired){await worker.terminate();return {};}
+    await worker.setParameters({tessedit_pageseg_mode:"6"});
+    const read=async(file,rotation,from,to)=>{
+      const result=await worker.recognize(await ocrImage(file,rotation),{},{text:false,tsv:true});
+      return scanTimes(result.data.tsv||"",from,to);
+    };
+    const first=await read(data.back,data.backRotation,1,data.late?15:lastDay);
+    return data.late?{...first,...await read(data.late,data.lateRotation,16,lastDay)}:first;
+  })();
+  try{
+    const limit=new Promise((_,reject)=>{timer=setTimeout(()=>{expired=true;reject(Error("OCR timeout"));},35000);});
+    const daily=await Promise.race([recognition,limit]);
+    lastScan={key,daily};
+    return daily;
+  }catch{return {};}
+  finally{clearTimeout(timer);if(worker)await worker.terminate().catch(()=>{});}
+}
+
 function writeCanvasText(ctx,text,maxWidth) {
   const lines=[];let line="";
   for(const char of String(text)){
@@ -219,8 +305,16 @@ async function makeCardPdf(data, capturePreview = null) {
       capturePreview(frame);
     }
     ctx.fillStyle="#183a2e";ctx.font="bold 26px sans-serif";
-    ctx.fillText("每日工时：待按工卡照片核对",56,1190,1128);
-    ctx.fillText("Advance "+(data.advance==null?"未录入":"RM "+data.advance.toFixed(2)),56,1240,1128);
+    ctx.fillText("每日工时（自动识别，待核对）",56,1162,1128);
+    ctx.font="22px sans-serif";
+    const detected=Object.entries(data.recognized);
+    if(!detected.length)ctx.fillText("未识别到可用工时，请对照照片。",56,1210,1128);
+    for(const [day,minutes] of detected){
+      const pos=Number(day)-1;
+      ctx.fillText(day+" 日  "+hourText(minutes),56+(pos%5)*229,1210+Math.floor(pos/5)*39);
+    }
+    ctx.font="bold 26px sans-serif";
+    ctx.fillText("Advance "+(data.advance==null?"未录入":"RM "+data.advance.toFixed(2)),56,1500,1128);
     ctx.font="22px sans-serif";
     writeCanvasText(ctx,"备注："+(data.notes||"无"),1128).slice(0,4).forEach((line,i)=>ctx.fillText(line,56,1550+i*32));
     ctx.fillText("请以本页工卡照片核对每日工时。",56,1703);
@@ -231,7 +325,7 @@ async function makeCardPdf(data, capturePreview = null) {
 }
 function resetPreview(){
   if(pdfUrl)URL.revokeObjectURL(pdfUrl);
-  pdfUrl="";get("pdf-open").hidden=true;get("pdf-open").removeAttribute("href");
+  pdfUrl="";get("ocr-summary").textContent="预览或提交时自动识别内页工时。";get("pdf-open").hidden=true;get("pdf-open").removeAttribute("href");
 }
 function showPreview(pdf){
   resetPreview();pdfUrl=URL.createObjectURL(pdf);
@@ -239,7 +333,7 @@ function showPreview(pdf){
 }
 function clearSession() {
   session="";scope={projects:[],workers:[],office:false,petty_cash:false};queue=null;
-  resetPreview();get("workspace").hidden=true;get("login-panel").hidden=false;
+  lastScan=undefined;resetPreview();get("workspace").hidden=true;get("login-panel").hidden=false;
   get("card-form").reset();syncPhotoMode();get("cash-form").reset();get("office-items").replaceChildren();get("office-count").textContent="";
   get("month").value=today.slice(0,7);get("review-month").value=today.slice(0,7);get("date").value=today;
   cardId=null;cardIdentity="";cashId=null;cashIdentity="";
@@ -295,15 +389,19 @@ async function processCard(submit){
   if(busy)return;setBusy(true);
   try{
     const data=cardData();
+    get("ocr-summary").textContent="正在识别工卡内页…";
+    data.recognized=await recognizeCard(data);
+    const count=Object.keys(data.recognized).length;
     let previewImage;
     const pdf=await makeCardPdf(data,submit?image=>{previewImage=image;}:null);
     if(pdf.size>3145728)throw Error("size");
     showPreview(pdf);
+    get("ocr-summary").textContent=count?"识别到 "+count+" 天工时，待办公室核对。":"未识别到可用工时，办公室可核对内页照片。";
     if(!submit){say("一页 PDF 已生成，可先核对。");return;}
     const identity=data.project.id+"/"+data.worker.ref+"/"+data.month;
     if(identity!==cardIdentity){cardId=crypto.randomUUID();cardIdentity=identity;}
-    const path=await rpc("prepare_card",{card_id:cardId,selected_project:data.project.id,worker_ref:data.worker.ref,
-      work_month:data.month+"-01",minutes_by_day:{},advance:data.advance,remarks:data.notes});
+    const path=await rpc("prepare_scanned_card",{card_id:cardId,selected_project:data.project.id,worker_ref:data.worker.ref,
+      work_month:data.month+"-01",recognized_minutes:data.recognized,advance:data.advance,remarks:data.notes});
     const digest=[...new Uint8Array(await crypto.subtle.digest("SHA-256",await pdf.arrayBuffer()))].map(x=>x.toString(16).padStart(2,"0")).join("");
     await api("storage/v1/object/kkt-site-card-previews-staging/"+path.replace(/\.pdf$/, ".jpg"),
       previewImage,"POST","image/jpeg",{"x-upsert":"true"});
@@ -341,7 +439,7 @@ get("office-form").addEventListener("submit",async e=>{
     get("office-count").textContent="工卡 "+queue.cards.length+" 份 · 现有工地名单待核对 "+missing.length+" 人 · Petty Cash "+queue.petty_cash.length+" 笔";
     for(const row of queue.cards){
       const li=document.createElement("li");
-      li.textContent=[row.name,row.employee_ref,row.project,row.total_minutes==null?"工时待核对":hourText(row.total_minutes),row.status==="archived"?"已归档":"待归档"].filter(Boolean).join(" · ");
+      li.textContent=[row.name,row.employee_ref,row.project,row.total_minutes==null?"OCR "+Object.keys(row.ocr_daily_minutes||{}).length+" 天，工时待核对":hourText(row.total_minutes),row.status==="archived"?"已归档":"待归档"].filter(Boolean).join(" · ");
       const archive=driveLink(row.onedrive_drive_id,row.onedrive_item_id);
       if(archive){const a=document.createElement("a");a.href=archive;a.target="_blank";a.rel="noopener noreferrer";a.textContent="OneDrive PDF";li.append(" ",a);}
       else{
@@ -408,7 +506,11 @@ function reviewWorkbook(batch) {
     "Basic Salary RM","Overtime RM","Employee EPF RM","Employer EPF RM","Employee SOCSO RM","Employer SOCSO RM",
     "Employee EIS RM","Employer EIS RM","PCB RM","Other Deductions RM","Net Pay RM","Archive Status","Office Review","Notes","OneDrive"]];
   const daily=[["Employee Code","Name","Project","Month","Day","Work Minutes","Work Hours"]];
+  const detectedHours=[["Employee Code","Name","Project","Month","Day","OCR Minutes (Unverified)"]];
   for(const r of batch.cards){
+    for(const [day,minutes] of Object.entries(r.ocr_daily_minutes||{}).sort()){
+      detectedHours.push([r.employee_ref,r.name,r.project,r.month,Number(day),Number(minutes)]);
+    }
     summary.push([r.employee_ref,r.name,r.project,r.month,r.total_minutes==null?null:Number(r.total_minutes),r.total_minutes==null?null:Number((r.total_minutes/60).toFixed(4)),r.advance_rm==null?null:Number(r.advance_rm),
       ...Array(11).fill(null),r.status==="archived"?"Archived":"Pending archive",r.total_minutes==null?"Pending work-card review":"Pending verification",r.notes,driveLink(r.onedrive_drive_id,r.onedrive_item_id)]);
     for(const [day,minutes] of Object.entries(r.daily_minutes).sort()){
@@ -423,7 +525,7 @@ function reviewWorkbook(batch) {
   }
   const petty=[["Date","Site Supervisor","Site","Amount RM","Purpose","Receipt Reference","Office Review"]];
   for(const r of batch.petty_cash)petty.push([r.spent_on,r.supervisor,r.site,Number(r.amount_rm),r.description,r.receipt_reference,"Pending verification"]);
-  const sheets=[["Payroll Review",summary],["Daily Work Hours",daily],["Petty Cash",petty]];
+  const sheets=[["Payroll Review",summary],["Daily Work Hours",daily],["OCR Pending Review",detectedHours],["Petty Cash",petty]];
   const documentRel="http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
   const root="http://schemas.openxmlformats.org/package/2006/";
   const files=[
