@@ -31,6 +31,7 @@
     form button{width:100%;margin-top:18px}
     #logout{background:#fff;color:#172d42}
     .overview-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    #copy-access-token{margin-top:12px}
     #status{margin:14px 0;min-height:1.5em}
     .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,178px),1fr));gap:10px;margin:18px 0}
     .summary p{font-size:1.35rem;font-weight:700}
@@ -85,6 +86,7 @@
         <button id="lock" type="button">锁定</button>
       </div>
       <p class="muted">以下是演示用的模拟资料。</p>
+      <button id="copy-access-token" type="button">复制 access_token</button>
       <div class="summary" aria-label="模拟统计">
         <article><h2>工程进行中</h2><p>2</p></article>
         <article><h2>待审核进度款</h2><p>RM 12,800.00</p></article>
@@ -114,6 +116,7 @@
     const pinSetup = byId('pin-setup');
     const pinLock = byId('pin-lock');
     const logout = byId('logout');
+    const copyAccessToken = byId('copy-access-token');
     const status = byId('status');
     const maxPinAttempts = 5;
     const sixDigits = /^[0-9]{6}$/;
@@ -250,6 +253,27 @@
     });
 
     byId('lock').addEventListener('click', lockDashboard);
+
+    copyAccessToken.addEventListener('click', async () => {
+      checkExpiry();
+      if (!session?.pin || dashboard.hidden || document.hidden || copyAccessToken.disabled) return;
+
+      const active = session;
+      copyAccessToken.disabled = true;
+      try {
+        await navigator.clipboard.writeText(active.token);
+        if (session === active && !dashboard.hidden) {
+          status.textContent = '已复制 access_token。请直接贴入 UiPath 的 Password 栏。';
+        }
+      } catch {
+        if (session === active && !dashboard.hidden) {
+          status.textContent = '无法复制。请使用手机 Chrome 打开此页后重试。';
+        }
+      } finally {
+        copyAccessToken.disabled = false;
+      }
+    });
+
     byId('pin-unlock').addEventListener('submit', async event => {
       event.preventDefault();
       checkExpiry();
